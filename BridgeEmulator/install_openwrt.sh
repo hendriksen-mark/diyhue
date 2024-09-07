@@ -5,7 +5,7 @@ opkg update
 wait
 
 echo -e "\033[32m Installing dependencies.\033[0m"
-opkg install ca-bundle git git-http nano nmap python3 python3-pip python3-setuptools openssl-util curl unzip coap-client kmod-bluetooth bluez-daemon ca-certificates libustream-wolfssl libcurl
+opkg install ca-bundle git git-http nano nmap python3 python3-pip python3-setuptools openssl-util curl unzip coap-client kmod-bluetooth bluez-daemon ca-certificates libustream-wolfssl libcurl coreutils-stat
 wait
 
 echo -e "\033[32m Creating directories.\033[0m"
@@ -33,7 +33,7 @@ cp -r configManager /opt/hue-emulator/
 cp -r logManager /opt/hue-emulator/
 cp -r HueEmulator3.py /opt/hue-emulator/
 cp -r githubInstall.sh /opt/hue-emulator/
-cp -r genCert.sh /opt/hue-emulator/
+cp -r openssl.conf /opt/hue-emulator/
 
 echo -e "\033[32m Copy web interface files.\033[0m"
 curl -sL https://www.github.com/diyhue/diyHueUI/releases/latest/download/DiyHueUI-release.zip -o diyHueUI.zip
@@ -55,8 +55,6 @@ echo -e "\033[32m Creating certificate.\033[0m"
 cd /opt/hue-emulator
 mkdir -p /opt/hue-emulator/config
 mac=`cat /sys/class/net/br-lan/address`
-curl https://raw.githubusercontent.com/mariusmotea/diyHue/9ceed19b4211aa85a90fac9ea6d45cfeb746c9dd/BridgeEmulator/openssl.conf -o openssl.conf
-wait
 serial="${mac:0:2}${mac:3:2}${mac:6:2}fffe${mac:9:2}${mac:12:2}${mac:15:2}"
 dec_serial=`python3 -c "print(int(\"$serial\", 16))"`
 openssl req -new -days 3650 -config openssl.conf -nodes -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:named_curve -subj "/C=NL/O=Philips Hue/CN=$serial" -keyout private.key -out public.crt -set_serial $dec_serial
@@ -67,7 +65,6 @@ cat public.crt >> /opt/hue-emulator/config/cert.pem
 rm private.key public.crt
 
 echo -e "\033[32m Changing permissions.\033[0m"
-chmod +x /etc/init.d/hueemulatorWrt-service
 chmod +x /opt/hue-emulator/HueEmulator3.py
 chmod +x /opt/hue-emulator/HueObjects
 chmod +x /opt/hue-emulator/configManager
@@ -78,10 +75,12 @@ chmod +x /opt/hue-emulator/logManager
 chmod +x /opt/hue-emulator/sensors
 chmod +x /opt/hue-emulator/services
 chmod +x /opt/hue-emulator/functions/network.py
+chmod +x /opt/hue-emulator/config
 
 echo -e "\033[32m Copy startup service.\033[0m"
 cd /opt/tmp/diyHue/BridgeEmulator
 cp hueemulatorWrt-service /etc/init.d/
+chmod +x /etc/init.d/hueemulatorWrt-service
 
 echo -e "\033[32m Enable startup service.\033[0m"
 /etc/init.d/hueemulatorWrt-service enable
