@@ -65,24 +65,67 @@ def triggerScript(behavior_instance):
                 sleep(behavior_instance.configuration["fade_out_duration"]["seconds"])
                 if behavior_instance.configuration["end_state"] ==  "turn_off":
                     group.setV1Action(state={"on": False})
+                behavior_instance.active = False
                 logging.debug("Finish Go to Sleep")
 
     # Activate scene
     elif behavior_instance.script_id == "7238c707-8693-4f19-9095-ccdc1444d228":
-        logging.debug("Start routine " + behavior_instance.name)
+        if behavior_instance.active and "end_at" in behavior_instance.configuration["when_extended"]:
+            logging.debug("End routine " + behavior_instance.name)
+            for element in behavior_instance.configuration["what"]:
+              if "group" in element:
+                  scene = findScene(element)
+                  if scene:
+                      logging.info("Deactivate scene " + scene.name)
+                      putDict = {"recall": {"action": "deactivate"}}
+                      scene.activate(putDict)
+                  group = findGroup(element["group"]["rid"])
+                  logging.info("Turn off group " + group.name)
+                  group.setV1Action({"on": False})
+                  behavior_instance.active = False
+        else:
+            logging.debug("Start routine " + behavior_instance.name)
+            for element in behavior_instance.configuration["what"]:
+              if "group" in element:
+                  scene = findScene(element)
+                  if scene:
+                      logging.info("Activate scene " + scene.name)
+                      if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
+                          putDict = {"recall": {"action": "active"}, "minutes": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"]}
+                          scene.activate(putDict)
+                  else:
+                      group = findGroup(element["group"]["rid"])
+                      if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b": # Bright scene
+                          logging.info("Apply Bright scene to group " + group.name)
+                          group.setV1Action(state={"ct": 247, "bri": 1})
+                          sleep(1)
+                          group.setV1Action(state={"on": True})
+                          group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"] * 60 * 10})
+                          #group.setV1Action({"on": True, "bri": 254, "ct": 247})
+                  behavior_instance.active = True if "end_at" in behavior_instance.configuration["when_extended"] else False
+
+    # Countdown Timer
+    elif behavior_instance.script_id == "e73bc72d-96b1-46f8-aa57-729861f80c78":
+        logging.debug("Start Countdown Timer " + behavior_instance.name)
+        behavior_instance.active = True
         for element in behavior_instance.configuration["what"]:
             if "group" in element:
                 scene = findScene(element)
+                group = findGroup(element["group"]["rid"])
                 if scene:
-                    if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
-                        scene.activate(behavior_instance.configuration["when_extended"]["start_at"]["transition"])
-                    else:
-                        scene.activate({})
+                    logging.info("Activate scene " + scene.name)
+                    putDict = {"recall": {"action": "active"}}
+                    scene.activate(putDict)
                 else:
-                    group = findGroup(element["group"]["rid"])
-                    if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b": # Bright scene
-                        logging.info("Apply Bright scene to group " + group.name)
-                        group.setV1Action({"on": True, "bri": 254, "ct": 247})
+                  if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b": # Bright scene
+                      logging.info("Apply Bright scene to group " + group.name)
+                      group.setV1Action(state={"on": True, "bri": 254, "ct": 247})
+                sleep(behavior_instance.configuration["duration"]["seconds"])
+                if behavior_instance.active == True:
+                    group.setV1Action(state={"on": False})
+                behavior_instance.active = False
+                behavior_instance.update_attr({"enabled":False})
+                logging.debug("Finish Countdown Timer " + behavior_instance.name)
 
 
 def behaviorScripts():
@@ -118,42 +161,6 @@ def behaviorScripts():
       "supported_features": [
         "style_sunrise"
       ],
-      "trigger_schema": {
-        "$ref": "trigger.json#"
-      },
-      "type": "behavior_script",
-      "version": "0.0.1"
-    },
-    {
-      "configuration_schema": {
-        "$ref": "coming_home_config.json#"
-      },
-      "description": "Automatically turn your lights to choosen light states, when you arrive at home.",
-      "id": "fd60fcd1-4809-4813-b510-4a18856a595c",
-      "metadata": {
-        "category": "automation",
-        "name": "Coming home"
-      },
-      "state_schema": {},
-      "supported_features": [],
-      "trigger_schema": {
-        "$ref": "trigger.json#"
-      },
-      "type": "behavior_script",
-      "version": "0.0.1"
-    },
-    {
-      "configuration_schema": {
-        "$ref": "leaving_home_config.json#"
-      },
-      "description": "Automatically turn off your lights when you leave",
-      "id": "0194752a-2d53-4f92-8209-dfdc52745af3",
-      "metadata": {
-        "category": "automation",
-        "name": "Leaving home"
-      },
-      "state_schema": {},
-      "supported_features": [],
       "trigger_schema": {
         "$ref": "trigger.json#"
       },
@@ -233,4 +240,97 @@ def behaviorScripts():
       },
       "type": "behavior_script",
       "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Contact Sensor script",
+      "id": "049008e6-62d7-42ba-b473-d8488cfde600",
+      "metadata": {
+        "category": "accessory",
+        "name": "Contact Sensor"
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Generic switches script",
+      "id": "67d9395b-4403-42cc-b5f0-740b699d67c6",
+      "metadata": {
+        "category": "accessory",
+        "name": "Hue Switches"
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory",
+        "name": "Motion Sensor"
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "pm_config.json#"
+      },
+      "description": "PM Automation",
+      "id": "db06cabc-c752-4904-9e8f-4ebe98feaa1a",
+      "metadata": {
+        "category": "automation",
+        "name": "PM"
+      },
+      "state_schema": {
+        "$ref": "pm_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {
+        "$ref": "pm_trigger.json#"
+      },
+      "type": "behavior_script",
+      "version": "0.0.1",
+      "max_number_instances": 1
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Tap Switch script",
+      "id": "f306f634-acdb-4dd6-bdf5-48dd626d667e",
+      "metadata": {
+        "category": "accessory",
+        "name": "Tap Switch",
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1",
     }]
