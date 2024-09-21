@@ -181,18 +181,6 @@ class Device():
             )
 
         result["services"].extend([{
-            "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button1')),
-            "rtype": "button"
-        }, {
-            "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button2')),
-            "rtype": "button"
-        }, {
-            "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button3')),
-            "rtype": "button"
-        }, {
-            "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button4')),
-            "rtype": "button"
-        }, {
             "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
             "rtype": "device_power"
         }, {
