@@ -92,8 +92,10 @@ class NewUser(Resource):
                 return response
             else:
                 logging.error("link button not pressed")
-                logging.error("last_button_press" + str(last_button_press))
-                logging.error("current time" + str(datetime.now().timestamp()))
+                logging.error("last_button_press " + str(last_button_press))
+                logging.error("current_time      " + str(datetime.now().timestamp()))
+                if last_button_press != datetime.now().timestamp():
+                    logging.error("last_button_press is not current_time, please check timezone setting")
                 return [{"error": {"type": 101, "address": "/api/", "description": "link button not pressed"}}]
         else:
             logging.error("parameter, " + list(postDict.keys())[0] + ", not available")
@@ -148,7 +150,6 @@ class ResourceElements(Resource):
             return authorisation
 
         if resource in ["lights", "sensors"] and request.get_data(as_text=True) == "":
-            print("scan for light")
             # if was a request to scan for lights of sensors
             Thread(target=scanForLights).start()
             return [{"success": {"/" + resource: "Searching for new devices"}}]

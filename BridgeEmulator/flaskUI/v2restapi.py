@@ -26,7 +26,7 @@ v2Resources = {"light": {}, "scene": {}, "smart_scene": {}, "grouped_light": {},
 
 
 def getObject(element, v2uuid):
-    if element in ["behavior_instance", "device"]:
+    if element in ["behavior_instance"]:
         return bridgeConfig[element][v2uuid]
     elif element in v2Resources and v2uuid in v2Resources[element]:
         logging.debug("Cache Hit for " + element)
@@ -47,6 +47,10 @@ def getObject(element, v2uuid):
         for v1Element in ["lights", "groups", "scenes", "sensors", "geofence_clients"]:
             for key, obj in bridgeConfig[v1Element].items():
                 if str(uuid.uuid5(uuid.NAMESPACE_URL, obj.id_v2 + element)) == v2uuid:
+                    logging.debug("Cache Miss " + element)
+                    v2Resources[element][v2uuid] = weakref.ref(obj)
+                    return obj
+                elif obj.id_v2 == v2uuid:
                     logging.debug("Cache Miss " + element)
                     v2Resources[element][v2uuid] = weakref.ref(obj)
                     return obj
@@ -201,8 +205,9 @@ def v2DiyHueBridge():
         "id_v1": "",
         "owner": {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, bridge_id + 'device')), "rtype": "device"},
         "type": "diyhue",
-        "Hue Essentials key": bridgeConfig["config"]["Hue Essentials key"], 
-        "Remote API enabled": bridgeConfig["config"]["Remote API enabled"]
+        "hue_essentials_key": bridgeConfig["config"]["Hue Essentials key"], 
+        "remote_api_enabled": bridgeConfig["config"]["Remote API enabled"],
+        "remote_discovery": bridgeConfig["config"]["discovery"]
     }
 
 class AuthV1(Resource):
