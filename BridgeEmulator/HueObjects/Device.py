@@ -144,7 +144,7 @@ class Device():
                 "button": {
                     "last_event": "short_release",
                     "button_report": {
-                        "updated": self.state["lastupdated"],
+                        "updated": self.state["lastupdated"] if "lastupdated" in self.state else "",
                         "event": "initial_press"
                     },
                     "repeat_interval": 800,
