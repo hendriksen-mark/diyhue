@@ -121,11 +121,11 @@ def parse_arguments():
 
     logging.info("Using Host %s:%s" % (host_ip, host_http_port))
 
-    if args.mac and str(args.mac).replace(":", "").upper() != "XXXXXXXXXXXX":
+    if args.mac:# and str(args.mac).replace(":", "").upper() != "XXXXXXXXXXXX":
         dockerMAC = args.mac  # keeps : for cert generation
         logging.debug(dockerMAC)
         mac = str(args.mac).replace(":", "")
-    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").upper() != "XXXXXXXXXXXX":
+    elif get_environment_variable('MAC'):# and get_environment_variable('MAC').strip('\u200e').replace(":", "").upper() != "XXXXXXXXXXXX":
         dockerMAC = get_environment_variable('MAC').strip('\u200e')
         logging.debug(dockerMAC)
         mac = str(dockerMAC).replace(":", "")
