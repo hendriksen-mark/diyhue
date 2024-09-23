@@ -5,15 +5,16 @@ services:
     # This makes for more convienient naming, but only allows one instance of the image
     container_name: diyHue
     restart: unless-stopped
-
+    privileged: true
     environment:
       # Uncomment to enable debug mode 
-      # DEBUG: true
+      DEBUG: true
       # IP and MAC are only needed for running diyHue in the bridge network
       IP: 192.168.1.2
       MAC: 12:34:56:78:90
+      TZ: Europe/Amsterdam
     volumes:
-      - /mnt/hue-emulator/export:/opt/hue-emulator/export
+      - /opt/hue-emulator/config:/opt/hue-emulator/config
     ports:
       - '80:80'
       - '443:443'
