@@ -121,11 +121,11 @@ def parse_arguments():
 
     logging.info("Using Host %s:%s" % (host_ip, host_http_port))
 
-    if args.mac and str(args.mac).replace(":", "").capitalize != "XXXXXXXXXXXX":
+    if args.mac and str(args.mac).replace(":", "").capitalize() != "XXXXXXXXXXXX":
         dockerMAC = args.mac  # keeps : for cert generation
         logging.debug(dockerMAC)
         mac = str(args.mac).replace(":", "")
-    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").capitalize != "XXXXXXXXXXXX":
+    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").capitalize() != "XXXXXXXXXXXX":
         dockerMAC = get_environment_variable('MAC').strip('\u200e')
         logging.debug(dockerMAC)
         mac = str(dockerMAC).replace(":", "")
@@ -142,11 +142,11 @@ def parse_arguments():
     argumentDict["FULLMAC"] = dockerMAC
     argumentDict["MAC"] = mac
     argumentDict["DOCKER"] = docker
-    if mac.capitalize == "XXXXXXXXXXXX" or mac == "":
+    if mac.capitalize() == "XXXXXXXXXXXX" or mac == "":
         logging.error("No valid MAC address provided" + str(mac))
         logging.error("To fix this visit: https://diyhue.readthedocs.io/en/latest/getting_started.html")
     else:
-        logging.info("Host MAC given as " + mac)
+        logging.info("Host MAC given as " + mac + " " + mac.capitalize())
 
     if args.ip_range or get_environment_variable('IP_RANGE'):
         if args.ip_range:
