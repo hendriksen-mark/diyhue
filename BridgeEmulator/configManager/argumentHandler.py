@@ -36,7 +36,7 @@ def process_arguments(configDir, args):
 def parse_arguments():
     argumentDict = {"BIND_IP": '', "HOST_IP": '', "HTTP_PORT": '', "HTTPS_PORT": '', "FULLMAC": '', "MAC": '', "DEBUG": False, "DOCKER": False,
                     "IP_RANGE_START": '', "IP_RANGE_END": '', "DECONZ": '', "scanOnHostIP": False, "disableOnlineDiscover": '', "noLinkButton": False,
-                    "noServeHttps": False, "TZ": ''}
+                    "noServeHttps": False, "TZ": '', "BRANCH": ''}
     ap = argparse.ArgumentParser()
 
     # Arguements can also be passed as Environment Variables.
@@ -57,6 +57,7 @@ def parse_arguments():
                     help="DANGEROUS! Don't require the link button to be pressed to pair the Hue app, just allow any app to connect")
     ap.add_argument("--disable-online-discover", help="Disable Online and Remote API functions")
     ap.add_argument("--TZ", help="Set time zone", type=str)
+    ap.add_argument("--BRANCH", help="Set used BRANCH. master by default", type=str)
 
     args = ap.parse_args()
 
@@ -92,6 +93,13 @@ def parse_arguments():
     elif get_environment_variable('TZ'):
         tz = get_environment_variable('TZ')
     argumentDict["TZ"] = tz
+
+    branch = "master"
+    if args.BRANCH:
+        branch = args.BRANCH
+    elif get_environment_variable('BRANCH'):
+        branch = get_environment_variable('BRANCH')
+    argumentDict["BRANCH"] = branch
 
     if args.ip:
         host_ip = args.ip

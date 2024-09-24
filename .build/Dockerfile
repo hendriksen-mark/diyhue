@@ -5,11 +5,15 @@ WORKDIR /opt/hue-emulator
 
 # Architecture automatically set by docker eg. linux/amd64, linux/arm/v7, linux/arm64
 ARG TARGETPLATFORM
+ARG BRANCH
+ENV BRANCH=$BRANCH
 
 # ============================ Actual image from here ====================
 FROM debian:stable-slim as prod
 WORKDIR /opt/hue-emulator
 ARG TARGETPLATFORM
+ARG BRANCH
+ENV BRANCH=$BRANCH
 
 COPY requirements.txt ./
 

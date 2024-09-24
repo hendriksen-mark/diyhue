@@ -35,7 +35,7 @@ jobs:
 
       - name: Build docker image
         run: |
-          docker build -t diyhue/diyhue:ci -f ./.build/Dockerfile --platform=${{ matrix.arch }} --build-arg TARGETPLATFORM=${{ matrix.arch }} .
+          docker build -t diyhue/diyhue:ci -f ./.build/Dockerfile --platform=${{ matrix.arch }} --build-arg TARGETPLATFORM=${{ matrix.arch }} --build-arg BRANCH=${{GITHUB.ref_name}} .
 
       - name: Save tarball
         run: |

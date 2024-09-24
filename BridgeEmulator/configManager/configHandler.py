@@ -90,6 +90,8 @@ class Config:
                         "state": "noupdates",
                         "install": False
                         }
+                if "branch" not in config:
+                    config["branch"] = parse_arguments()["BRANCH"]
 
                 if int(config["swversion"]) < 1958077010:
                     config["swversion"] = "1965111030"
@@ -139,7 +141,8 @@ class Config:
                                     "lastchange": "2020-12-13T10:30:15",
                                     "state": "noupdates",
                                     "install": False
-                                    }
+                                    },
+                    "branch": parse_arguments()["BRANCH"]
                 }
             # load lights
             if os.path.exists(self.configDir + "/lights.yaml"):

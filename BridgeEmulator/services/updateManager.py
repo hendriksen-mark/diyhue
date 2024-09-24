@@ -8,6 +8,8 @@ import subprocess
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
 
+branch = bridgeConfig["config"]["branch"]
+
 def versionCheck():
     swversion = bridgeConfig["config"]["swversion"]
     url = "https://firmware.meethue.com/v1/checkupdate/?deviceTypeId=BSB002&version=" + swversion
@@ -43,7 +45,7 @@ def githubCheck():
         creation_time = creation_time_arg1[0] + " " + creation_time_arg1[1] + " " + creation_time_arg1[3].replace("\n", "")#2024-02-18 19:50:15 +0100
         creation_time = datetime.strptime(creation_time, "%Y-%m-%d %H:%M:%S %z").astimezone(timezone.utc).strftime("%Y-%m-%d %H")#2024-02-18 18
 
-    url = "https://api.github.com/repos/diyhue/diyhue/branches/master"
+    url = "https://api.github.com/repos/diyhue/diyhue/branches/" + branch
     #url = "https://api.github.com/repos/hendriksen-mark/diyhue/branches/master"
     try:
         response = requests.get(url)
@@ -102,7 +104,7 @@ def githubUICheck():
 
 def githubInstall():
     if bridgeConfig["config"]["swupdate2"]["state"] in ["allreadytoinstall", "anyreadytoinstall"]:#diyhue + ui update
-        subprocess.Popen("sh githubInstall.sh " + bridgeConfig["config"]["ipaddress"] + " " + bridgeConfig["config"]["swupdate2"]["state"],shell=True, close_fds=True)
+        subprocess.Popen("sh githubInstall.sh " + bridgeConfig["config"]["ipaddress"] + " " + bridgeConfig["config"]["swupdate2"]["state"] + " " + branch,shell=True, close_fds=True)
         bridgeConfig["config"]["swupdate2"]["state"] = "installing"
 
 def startupCheck():
