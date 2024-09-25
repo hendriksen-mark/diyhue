@@ -132,16 +132,13 @@ def parse_arguments():
 
     if args.mac and str(args.mac).replace(":", "").upper() != "XXXXXXXXXXXX":
         dockerMAC = args.mac  # keeps : for cert generation
-        logging.debug(dockerMAC)
         mac = str(args.mac).replace(":", "")
     elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").upper() != "XXXXXXXXXXXX":
         dockerMAC = get_environment_variable('MAC').strip('\u200e')
-        logging.debug(dockerMAC)
         mac = str(dockerMAC).replace(":", "")
     else:
         dockerMAC = check_output("cat /sys/class/net/$(ip -o addr | grep -w %s | awk '{print $2}')/address" % host_ip,
                                  shell=True).decode('utf-8')[:-1]
-        logging.debug(dockerMAC)
         mac = str(dockerMAC).replace(":", "")
 
     if args.docker or get_environment_variable('DOCKER', True):
