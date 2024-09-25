@@ -16,27 +16,64 @@ echo -e "\033[32m Updating python3-pip.\033[0m"
 python3 -m pip install --upgrade pip
 wait
 
+### Choose Branch for Install
+echo -e "\033[36mPlease choose a Branch to install\033[0m"
+echo -e "\033[33mSelect Branch by entering the corresponding Number: [Default: $branchSelection]\033[0m  "
+echo -e "[1] Master Branch - most stable Release "
+echo -e "[2] Developer Branch - test latest features and fixes - Work in Progress!"
+echo -e "\033[36mNote: Please report any Bugs or Errors with Logs to our GitHub, Discourse or Slack. Thank you!\033[0m"
+echo -n "I go with Nr.: "
+
+branchSelection=""
+read userSelection
+case $userSelection in
+        1)
+        branchSelection="master"
+        echo -e "master selected"
+        ;;
+        2)
+        branchSelection="dev"
+        echo -e "Dev selected"
+        ;;
+				*)
+        branchSelection="master"
+        echo -e "master selected"
+        ;;
+esac
+
+if [ -d "/opt/hue-emulator" ]; then
+
+  systemctl stop hueemulatorWrt-service
+  echo -e "\033[33m Existing installation found, performing upgrade.\033[0m"
+
+  cp -r /opt/hue-emulator/config /tmp/diyhue_backup
+  rm -rf /opt/hue-emulator/*
+  cp -r /tmp/diyhue_backup /opt/hue-emulator/config
+
+fi
+
 cd /opt/tmp
-curl -sL -o diyhue.zip https://github.com/diyhue/diyhue/archive/master.zip
-#curl -sL -o diyhue.zip https://github.com/hendriksen-mark/diyhue/archive/master.zip
+curl -sL -o diyhue.zip https://github.com/diyhue/diyhue/archive/$branchSelection.zip
+#curl -sL -o diyhue.zip https://github.com/hendriksen-mark/diyhue/archive/$branchSelection.zip
 wait
 unzip -qo diyhue.zip
 wait
-cp -r diyHue-master/BridgeEmulator/flaskUI /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/functions /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/lights /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/sensors /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/HueObjects /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/services /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/configManager /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/logManager /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/HueEmulator3.py /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/githubInstall.sh /opt/hue-emulator/
-cp -r diyHue-master/BridgeEmulator/openssl.conf /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/flaskUI /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/functions /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/lights /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/sensors /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/HueObjects /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/services /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/configManager /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/logManager /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/HueEmulator3.py /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/githubInstall.sh /opt/hue-emulator/
+cp -r diyHue-$branchSelection/BridgeEmulator/openssl.conf /opt/hue-emulator/
 rm -Rf /opt/hue-emulator/BridgeEmulator/functions/network.py
-mv diyHue-master/BridgeEmulator/functions/network_OpenWrt.py /opt/hue-emulator/functions/network.py
-cp -r diyHue-master/BridgeEmulator/hueemulatorWrt-service /etc/init.d/
-python3 -m pip install -r diyHue-master/requirements.txt
+mv diyHue-$branchSelection/BridgeEmulator/functions/network_OpenWrt.py /opt/hue-emulator/functions/network.py
+sed 's/master/'$branchSelection'/g' diyHue-$branchSelection/BridgeEmulator/hueemulatorWrt-service
+cp -r diyHue-$branchSelection/BridgeEmulator/hueemulatorWrt-service /etc/init.d/
+python3 -m pip install -r diyHue-$branchSelection/requirements.txt
 wait
 
 echo -e "\033[32m Copy web interface files.\033[0m"

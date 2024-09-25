@@ -90,7 +90,7 @@ class Config:
                         "state": "noupdates",
                         "install": False
                         }
-                if "branch" not in config:
+                if "branch" not in config or config["branch"] != parse_arguments()["BRANCH"]:
                     config["branch"] = parse_arguments()["BRANCH"]
 
                 if int(config["swversion"]) < 1958077010:

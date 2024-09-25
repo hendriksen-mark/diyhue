@@ -155,6 +155,8 @@ mv index.html /opt/hue-emulator/flaskUI/templates/
 cp -r static /opt/hue-emulator/flaskUI/
 rm -r static
 
+sed 's/master/'$branchSelection'/g' hue-emulator.service
+
 cp hue-emulator.service /lib/systemd/system/
 cd ../../
 rm -rf diyHue.zip diyHue-$branchSelection
