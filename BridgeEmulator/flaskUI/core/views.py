@@ -134,6 +134,7 @@ def info():
     response["os_release"] = os.uname().release
     response["diyhue"] = subprocess.run("stat -c %y HueEmulator3.py", shell=True, capture_output=True, text=True).stdout.replace("\n", "")
     response["webui"] = subprocess.run("stat -c %y flaskUI/templates/index.html", shell=True, capture_output=True, text=True).stdout.replace("\n", "")
+    response["branch"] = bridgeConfig["config"]["branch"]
     return response
 
 @core.route('/login', methods=['GET', 'POST'])
