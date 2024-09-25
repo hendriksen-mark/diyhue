@@ -71,7 +71,7 @@ cp -r diyHue-$branchSelection/BridgeEmulator/githubInstall.sh /opt/hue-emulator/
 cp -r diyHue-$branchSelection/BridgeEmulator/openssl.conf /opt/hue-emulator/
 rm -Rf /opt/hue-emulator/BridgeEmulator/functions/network.py
 mv diyHue-$branchSelection/BridgeEmulator/functions/network_OpenWrt.py /opt/hue-emulator/functions/network.py
-sed 's/master/'$branchSelection'/g' diyHue-$branchSelection/BridgeEmulator/hueemulatorWrt-service
+sed -i 's/master/'$branchSelection'/g' diyHue-$branchSelection/BridgeEmulator/hueemulatorWrt-service
 cp -r diyHue-$branchSelection/BridgeEmulator/hueemulatorWrt-service /etc/init.d/
 python3 -m pip install -r diyHue-$branchSelection/requirements.txt
 wait

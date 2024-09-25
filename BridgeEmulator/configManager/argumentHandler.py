@@ -99,7 +99,8 @@ def parse_arguments():
         branch = args.BRANCH
     elif get_environment_variable('BRANCH'):
         branch = get_environment_variable('BRANCH')
-    argumentDict["BRANCH"] = branch
+    argumentDict["BRANCH"] = str(branch)
+    logging.info("Running DiyHue with branch: " + argumentDict["BRANCH"])
 
     if args.ip:
         host_ip = args.ip
