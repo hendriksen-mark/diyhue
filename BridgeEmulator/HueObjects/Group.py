@@ -131,8 +131,8 @@ class Group():
                 light = device().firstElement()
                 if light.state["on"]:
                     any_on = True
-                    if "bri" in light().state:
-                        bri = bri + light().state["bri"]
+                    if "bri" in light.state:
+                        bri = bri + light.state["bri"]
                         lights_on = lights_on + 1
                 else:
                     all_on = False
@@ -163,7 +163,7 @@ class Group():
                     "id": light.id_v2,
                     "id_v1": "/lights/" + light.id_v1,
                     "owner": {
-                        "rid": light().getDevice()["id"],
+                        "rid": self.id_v2,
                         "rtype":"device"
                     },
                     "service_id": light.protocol_cfg["light_nr"]-1 if "light_nr" in light.protocol_cfg else 0,

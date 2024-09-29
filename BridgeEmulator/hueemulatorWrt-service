@@ -2,7 +2,7 @@
 
 SCRIPT_NAME="HueEmulator3.py"
 SCRIPT_PATH="/opt/hue-emulator"
-SCRIPT_PARAMS="--BRANCH=master"
+SCRIPT_PARAMS="--debug --BRANCH=master"
 PID_FILE="/tmp/hue-emulator.pid"
 
 START=98
