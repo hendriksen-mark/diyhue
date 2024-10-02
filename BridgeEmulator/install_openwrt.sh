@@ -43,7 +43,7 @@ esac
 
 if [ -d "/opt/hue-emulator" ]; then
 
-  systemctl stop hueemulatorWrt-service
+  /etc/init.d/hueemulatorWrt-service stop
   echo -e "\033[33m Existing installation found, performing upgrade.\033[0m"
 
   cp -r /opt/hue-emulator/config /tmp/diyhue_backup
