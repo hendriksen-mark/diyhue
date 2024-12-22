@@ -77,6 +77,8 @@ def parse_arguments() -> Dict[str, Union[str, bool]]:
 
     logging.info(f"Using Host {argumentDict['HOST_IP']}:{argumentDict['HTTP_PORT']}")
     logging.info(f"Using Host {argumentDict['HOST_IP']}:{argumentDict['HTTPS_PORT']}")
+    logging.info(f"Bind to {argumentDict['BIND_IP']}:{argumentDict['HTTP_PORT']}")
+    logging.info(f"Bind to {argumentDict['BIND_IP']}:{argumentDict['HTTPS_PORT']}")
 
     mac, dockerMAC = get_mac_address(args, argumentDict)
 
@@ -171,7 +173,7 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
         bind_ip = get_environment_variable('BIND_IP')
     else:
         bind_ip = '0.0.0.0'
-    argumentDict["BIND_IP"] = bind_ip
+    logging.info(f"Bind IP set to {bind_ip}")
 
     if args.ip:
         host_ip = args.ip
@@ -182,6 +184,8 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
     else:
         host_ip = getIpAddress()
     argumentDict["HOST_IP"] = host_ip
+    argumentDict["BIND_IP"] = host_ip if bind_ip == '0.0.0.0' else bind_ip
+    logging.info(f"Bind IP set to {bind_ip}")
 
     if args.http_port:
         host_http_port = args.http_port
