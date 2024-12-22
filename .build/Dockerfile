@@ -1,13 +1,13 @@
 # This image just moves the correct bins to a specific folder.
 # Can also be used to compile the binaries (for an even better experience)
-FROM busybox as binselector
+FROM busybox AS binselector
 WORKDIR /opt/hue-emulator
 
 # Architecture automatically set by docker eg. linux/amd64, linux/arm/v7, linux/arm64
 ARG TARGETPLATFORM
 
 # ============================ Actual image from here ====================
-FROM debian:stable-slim as prod
+FROM debian:stable-slim AS prod
 WORKDIR /opt/hue-emulator
 ARG TARGETPLATFORM
 
