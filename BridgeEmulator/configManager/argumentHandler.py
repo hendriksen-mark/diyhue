@@ -3,42 +3,69 @@ import logManager
 from os import getenv, path
 from functions.network import getIpAddress
 from subprocess import check_output, call
+from typing import Union, Dict
 
 logging = logManager.logger.get_logger(__name__)
 
-def get_environment_variable(var, boolean=False):
+def get_environment_variable(var: str, boolean: bool = False) -> Union[str, bool]:
+    """
+    Retrieve the value of an environment variable.
+
+    Args:
+        var (str): The name of the environment variable.
+        boolean (bool): If True, interpret the value as a boolean.
+
+    Returns:
+        str or bool: The value of the environment variable, or False if boolean is True and the value is not "true".
+    """
     value = getenv(var)
     if boolean and value:
-        if value.lower() == "true":
-            value = True
-        else:
-            value = False
+        value = value.lower() == "true"
     return value
 
+def generate_certificate(mac: str, path: str) -> None:
+    """
+    Generate a certificate using the provided MAC address and save it to the specified path.
 
-def generate_certificate(mac, path):
+    Args:
+        mac (str): The MAC address to use for certificate generation.
+        path (str): The path where the certificate will be saved.
+    """
     logging.info("Generating certificate")
     serial = (mac[:6] + "fffe" + mac[-6:]).encode('utf-8')
     call(["/bin/bash", "/opt/hue-emulator/genCert.sh", serial, path])
     logging.info("Certificate created")
 
+def process_arguments(configDir: str, args: Dict[str, Union[str, bool]]) -> None:
+    """
+    Process the provided arguments and configure logging and certificate generation.
 
-def process_arguments(configDir, args):
-    if not args["DEBUG"]:
-        logManager.logger.configure_logger("INFO")
-        logging.info("Debug logging disabled!")
-    else:
-        logging.info("Debug logging enabled!")
-    if not path.isfile(configDir + "/cert.pem"):
+    Args:
+        configDir (str): The directory where configuration files are stored.
+        args (dict): A dictionary of arguments.
+    """
+    log_level = "DEBUG" if args["DEBUG"] else "INFO"
+    logManager.logger.configure_logger(log_level)
+    logging.info(f"Debug logging {'enabled' if args['DEBUG'] else 'disabled'}!")
+
+    if not path.isfile(path.join(configDir, "cert.pem")):
         generate_certificate(args["MAC"], configDir)
 
+def parse_arguments() -> Dict[str, Union[str, int, bool]]:
+    """
+    Parse command-line arguments and environment variables to configure the application.
 
-def parse_arguments():
-    argumentDict = {"BIND_IP": '', "HOST_IP": '', "HTTP_PORT": '', "HTTPS_PORT": '', "FULLMAC": '', "MAC": '', "DEBUG": False, "DOCKER": False,
-                    "noLinkButton": False, "noServeHttps": False}
+    Returns:
+        dict: A dictionary containing the parsed arguments and their values.
+    """
+    argumentDict = {
+        "BIND_IP": '0.0.0.0', "HOST_IP": '', "HTTP_PORT": 80, "HTTPS_PORT": 443,
+        "FULLMAC": '', "MAC": '', "DEBUG": False, "DOCKER": False,
+        "noLinkButton": False, "noServeHttps": False
+    }
     ap = argparse.ArgumentParser()
 
-    # Arguements can also be passed as Environment Variables.
+    # Arguments can also be passed as Environment Variables.
     ap.add_argument("--debug", action='store_true', help="Enables debug output")
     ap.add_argument("--bind-ip", help="The IP address to listen on", type=str)
     ap.add_argument("--config_path", help="Set certificate and config files location", type=str)
@@ -52,8 +79,7 @@ def parse_arguments():
     ap.add_argument("--sub-ip-range", help="Deprecated use webui, Set SUB IP range for light discovery. Format: <START_IP>,<STOP_IP>", type=str)
     ap.add_argument("--scan-on-host-ip", action='store_true', help="Deprecated use webui, Scan the local IP address when discovering new lights")
     ap.add_argument("--deconz", help="Deprecated use webui, Provide the IP address of your Deconz host. 127.0.0.1 by default.", type=str)
-    ap.add_argument("--no-link-button", action='store_true',
-                    help="DANGEROUS! Don't require the link button to be pressed to pair the Hue app, just allow any app to connect")
+    ap.add_argument("--no-link-button", action='store_true', help="DANGEROUS! Don't require the link button to be pressed to pair the Hue app, just allow any app to connect")
     ap.add_argument("--disable-online-discover", help="Deprecated use webui, Disable Online and Remote API functions")
     ap.add_argument("--TZ", help="Deprecated use webui, Set time zone", type=str)
 
@@ -62,89 +88,45 @@ def parse_arguments():
     if args.scan_on_host_ip:
         logging.warn("scan_on_host_ip is Deprecated in commandline and not active, please setup via webui")
 
-    if args.no_link_button:
-        argumentDict["noLinkButton"] = True
-
-    if args.no_serve_https:
-        argumentDict["noServeHttps"] = True
-
-    if args.debug or get_environment_variable('DEBUG', True):
-        argumentDict["DEBUG"] = True
-
-    if args.config_path:
-        config_path = args.config_path
-    elif get_environment_variable('CONFIG_PATH'):
-        config_path = get_environment_variable('CONFIG_PATH')
-    else:
-        config_path = '/opt/hue-emulator/config'
-    argumentDict["CONFIG_PATH"] = config_path
-
-    if args.bind_ip:
-        bind_ip = args.bind_ip
-    elif get_environment_variable('BIND_IP'):
-        bind_ip = get_environment_variable('BIND_IP')
-    else:
-        bind_ip = '0.0.0.0'
-    argumentDict["BIND_IP"] = bind_ip
+    argumentDict["noLinkButton"] = args.no_link_button
+    argumentDict["noServeHttps"] = args.no_serve_https
+    argumentDict["DEBUG"] = args.debug or get_environment_variable('DEBUG', True)
+    argumentDict["CONFIG_PATH"] = args.config_path or get_environment_variable('CONFIG_PATH') or '/opt/hue-emulator/config'
+    argumentDict["BIND_IP"] = args.bind_ip or get_environment_variable('BIND_IP') or '0.0.0.0'
+    argumentDict["HOST_IP"] = args.ip or get_environment_variable('IP') or argumentDict["BIND_IP"] if argumentDict["BIND_IP"] != '0.0.0.0' else getIpAddress()
+    argumentDict["HTTP_PORT"] = args.http_port or get_environment_variable('HTTP_PORT') or 80
+    argumentDict["HTTPS_PORT"] = args.https_port or get_environment_variable('HTTPS_PORT') or 443
 
     if args.TZ or get_environment_variable('TZ'):
         logging.warn("Time Zone is Deprecated in commandline and not active, please setup via webui")
 
-    if args.ip:
-        host_ip = args.ip
-    elif get_environment_variable('IP'):
-        host_ip = get_environment_variable('IP')
-    elif bind_ip != '0.0.0.0':
-        host_ip = bind_ip
-    else:
-        host_ip = getIpAddress()
-    argumentDict["HOST_IP"] = host_ip
 
-    if args.http_port:
-        host_http_port = args.http_port
-    elif get_environment_variable('HTTP_PORT'):
-        host_http_port = int(get_environment_variable('HTTP_PORT'))
-    else:
-        host_http_port = 80
-    argumentDict["HTTP_PORT"] = host_http_port
+    logging.info("Using Host %s:%s" % (argumentDict["HOST_IP"], argumentDict["HTTP_PORT"]))
+    logging.info("Using Host %s:%s" % (argumentDict["HOST_IP"], argumentDict["HTTPS_PORT"]))
 
-    if args.https_port:
-        host_https_port = args.https_port
-    elif get_environment_variable('HTTPS_PORT'):
-        host_https_port = int(get_environment_variable('HTTPS_PORT'))
-    else:
-        host_https_port = 443
-    argumentDict["HTTPS_PORT"] = host_https_port
-
-    logging.info("Using Host %s:%s" % (host_ip, host_http_port))
-    logging.info("Using Host %s:%s" % (host_ip, host_https_port))
-
-    if args.mac and str(args.mac).replace(":", "").capitalize != "XXXXXXXXXXXX":
+    if args.mac and str(args.mac).replace(":", "").capitalize() != "XXXXXXXXXXXX":
         dockerMAC = args.mac  # keeps : for cert generation
         mac = str(args.mac).replace(":", "")
-    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").capitalize != "XXXXXXXXXXXX":
+    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").capitalize() != "XXXXXXXXXXXX":
         dockerMAC = get_environment_variable('MAC').strip('\u200e')
         mac = str(dockerMAC).replace(":", "")
     else:
-        dockerMAC = check_output("cat /sys/class/net/$(ip -o addr | grep %s | awk '{print $2}')/address" % host_ip,
+        dockerMAC = check_output("cat /sys/class/net/$(ip -o addr | grep %s | awk '{print $2}')/address" % argumentDict["HOST_IP"],
                                  shell=True).decode('utf-8')[:-1]
         mac = str(dockerMAC).replace(":", "")
 
-    if args.docker or get_environment_variable('DOCKER', True):
-        docker = True
-    else:
-        docker = False
     argumentDict["FULLMAC"] = dockerMAC
     argumentDict["MAC"] = mac
-    argumentDict["DOCKER"] = docker
-    if mac.capitalize == "XXXXXXXXXXXX" or mac == "":
-        logging.exception("No valid MAC address provided " + str(mac))
-        logging.exception("To fix this visit: https://diyhue.readthedocs.io/en/latest/getting_started.html")
-        raise SystemExit("CRITICAL! No valid MAC address provided " + str(mac))
-    else:
-        logging.info("Host MAC given as " + mac)
+    argumentDict["DOCKER"] = args.docker or get_environment_variable('DOCKER', True)
 
-    if args.ip_range or get_environment_variable('IP_RANGE') or args.sub_ip_range or get_environment_variable('IP_RANGE_START') and get_environment_variable('IP_RANGE_END') or get_environment_variable('SUB_IP_RANGE') or get_environment_variable('SUB_IP_RANGE_START') or get_environment_variable('SUB_IP_RANGE_END'):
+    if mac.capitalize() == "XXXXXXXXXXXX" or not mac:
+        logging.exception(f"No valid MAC address provided {mac}")
+        logging.exception("To fix this visit: https://diyhue.readthedocs.io/en/latest/getting_started.html")
+        raise SystemExit(f"CRITICAL! No valid MAC address provided {mac}")
+    else:
+        logging.info(f"Host MAC given as {mac}")
+
+    if any([args.ip_range, get_environment_variable('IP_RANGE'), args.sub_ip_range, get_environment_variable('IP_RANGE_START'), get_environment_variable('IP_RANGE_END'), get_environment_variable('SUB_IP_RANGE'), get_environment_variable('SUB_IP_RANGE_START'), get_environment_variable('SUB_IP_RANGE_END')]):
         logging.warn("IP range is Deprecated in commandline and not active, please setup via webui")
 
     if args.deconz or get_environment_variable('DECONZ'):
