@@ -1,13 +1,17 @@
 from time import sleep
+import socket
+import json
+import uuid
+from subprocess import Popen, PIPE
+from typing import Dict, List, Tuple, Union, Optional
+
 import logManager
 import configManager
 import requests
-import socket, json, uuid
-from subprocess import Popen, PIPE
-from functions.colors import convert_rgb_xy, convert_xy
 import paho.mqtt.publish as publish
 import time
-from typing import Dict, List, Tuple, Union, Optional
+
+from functions.colors import convert_rgb_xy, convert_xy
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config

@@ -1,10 +1,11 @@
-import logging
 import requests
 from time import sleep
 from typing import Dict, Any
 import signal
 
-logging = logging.getLogger(__name__)
+import logManager
+
+logging = logManager.logger.get_logger(__name__)
 
 ### This service is needed for Hue Essentials to automatically discover the diyhue instance.
 
@@ -12,7 +13,7 @@ SLEEP_INTERVAL = 60
 DISCOVERY_URL = 'https://discovery.diyhue.org'
 running = True
 
-def run_remote_discover(config: Dict[str, Any], timeout: int = 5) -> None:
+def runRemoteDiscover(config: Dict[str, Any], timeout: int = 5) -> None:
     """
     Run the remote discovery service to allow Hue Essentials to discover the diyhue instance.
     

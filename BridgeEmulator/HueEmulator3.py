@@ -3,18 +3,22 @@ from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.security import check_password_hash
+from werkzeug.serving import WSGIRequestHandler
 from threading import Thread
 import ssl
-import os  # Import os module
+import os
+
 import configManager
 import logManager
 import flask_login
-from flaskUI.core import User # dummy import for flask_login module
-from flaskUI.restful import NewUser, ShortConfig, EntireConfig, ResourceElements, Element, ElementParam, ElementParamId
+from flaskUI.core import User  # dummy import for flask_login module
+from flaskUI.restful import (
+    NewUser, ShortConfig, EntireConfig, ResourceElements, Element, 
+    ElementParam, ElementParamId
+)
 from flaskUI.v2restapi import AuthV1, ClipV2, ClipV2Resource, ClipV2ResourceId
 from flaskUI.espDevices import Switch
 from flaskUI.Credits import Credits
-from werkzeug.serving import WSGIRequestHandler
 from functions.daylightSensor import daylightSensor
 
 # Initialize configurations and logging

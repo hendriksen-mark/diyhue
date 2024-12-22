@@ -1,7 +1,9 @@
 import socket
 import time
 from typing import Dict, List, Optional
+
 from zeroconf import IPVersion, ServiceInfo, Zeroconf
+
 import logManager
 
 logging = logManager.logger.get_logger(__name__)

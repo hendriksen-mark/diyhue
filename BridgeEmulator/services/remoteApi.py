@@ -1,8 +1,10 @@
 import base64
 import json
-import requests
 from time import sleep
 from typing import Dict, Any, Optional
+
+import requests
+
 import logManager
 
 logging = logManager.logger.get_logger(__name__)

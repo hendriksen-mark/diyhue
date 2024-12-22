@@ -1,8 +1,10 @@
 import json
-import time
 import threading
-from typing import Dict, Any, List
+import time
+from typing import Any, Dict, List
+
 from ws4py.client.threadedclient import WebSocketClient
+
 import logManager
 
 logging = logManager.logger.get_logger(__name__)

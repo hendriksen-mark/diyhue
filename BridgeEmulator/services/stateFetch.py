@@ -1,12 +1,12 @@
-import logging
 from time import sleep
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 import configManager
 from lights.protocols import protocols
+import logManager
 
-logging = logging.getLogger(__name__)
+logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config
 
 def syncWithLights(off_if_unreachable: bool) -> None:
