@@ -2,27 +2,11 @@ import argparse
 import logManager
 from os import getenv, path
 from functions.network import getIpAddress
-from subprocess import run, CompletedProcess
-from collections import defaultdict
-from typing import Dict, Tuple, Optional, Union
+from subprocess import check_output, call
 
 logging = logManager.logger.get_logger(__name__)
 
-DEPRECATED_WARNINGS = {
-    "scan_on_host_ip": "scan_on_host_ip is Deprecated in commandline and not active, please setup via webui",
-    "ip_range": "IP range is Deprecated in commandline and not active, please setup via webui",
-    "deconz": "DECONZ is Deprecated in commandline and not active, please setup via webui",
-    "disable_online_discover": "disableonlinediscover is Deprecated in commandline and not active, please setup via webui"
-}
-
-def get_environment_variable(var: str, boolean: bool = False) -> Union[str, bool, None]:
-    """
-    Get the value of an environment variable.
-
-    Args:
-        var (str): The name of the environment variable.
-        boolean (bool): Whether to interpret the value as a boolean.
-    """
+def get_environment_variable(var, boolean=False):
     value = getenv(var)
     if boolean and value:
         if value.lower() == "true":
@@ -31,130 +15,57 @@ def get_environment_variable(var: str, boolean: bool = False) -> Union[str, bool
             value = False
     return value
 
-def generate_certificate(mac: str, path: str) -> None:
-    """
-    Generate a certificate using the provided MAC address and path.
 
-    Args:
-        mac (str): The MAC address.
-        path (str): The path to save the certificate.
-    """
+def generate_certificate(mac, path):
     logging.info("Generating certificate")
     serial = (mac[:6] + "fffe" + mac[-6:]).encode('utf-8')
-    result: CompletedProcess = run(["/bin/bash", "/opt/hue-emulator/genCert.sh", serial, path], check=True)
-    if result.returncode == 0:
-        logging.info("Certificate created")
-    else:
-        logging.error("Certificate creation failed")
+    call(["/bin/bash", "/opt/hue-emulator/genCert.sh", serial, path])
+    logging.info("Certificate created")
 
-def process_arguments(configDir: str, args: Dict[str, Union[str, bool]]) -> None:
-    """
-    Process command-line arguments and configure logging and certificates.
 
-    Args:
-        configDir (str): The configuration directory.
-        args (dict): The command-line arguments.
-    """
-    configure_logging(args["DEBUG"])
-    if not path.isfile(path.join(configDir, "cert.pem")):
-        generate_certificate(args["MAC"], configDir)
-
-def parse_arguments() -> Dict[str, Union[str, bool]]:
-    """
-    Parse command-line arguments and environment variables.
-
-    Returns:
-        dict: The dictionary of parsed arguments.
-    """
-    argumentDict = initialize_argument_dict()
-
-    ap = argparse.ArgumentParser()
-    add_arguments(ap)
-    args = ap.parse_args()
-
-    set_arguments_from_args_and_env(argumentDict, args)
-
-    log_deprecated_warnings(args)
-
-    logging.info(f"Using Host {argumentDict['HOST_IP']}:{argumentDict['HTTP_PORT']}")
-    logging.info(f"Using Host {argumentDict['HOST_IP']}:{argumentDict['HTTPS_PORT']}")
-    logging.info(f"Bind to {argumentDict['BIND_IP']}:{argumentDict['HTTP_PORT']}")
-    logging.info(f"Bind to {argumentDict['BIND_IP']}:{argumentDict['HTTPS_PORT']}")
-
-    mac, dockerMAC = get_mac_address(args, argumentDict)
-
-    argumentDict["FULLMAC"] = dockerMAC
-    argumentDict["MAC"] = mac
-
-    validate_mac_address(mac)
-
-    if argumentDict['noServeHttps']:
-        logging.info("HTTPS Port Disabled")
-
-    return argumentDict
-
-def configure_logging(debug: bool) -> None:
-    """
-    Configure logging based on the debug flag.
-
-    Args:
-        debug (bool): Whether to enable debug logging.
-    """
-    if debug:
-        logging.info("Debug logging enabled!")
-    else:
+def process_arguments(configDir, args):
+    if not args["DEBUG"]:
         logManager.logger.configure_logger("INFO")
         logging.info("Debug logging disabled!")
+    else:
+        logging.info("Debug logging enabled!")
+    if not path.isfile(configDir + "/cert.pem"):
+        generate_certificate(args["MAC"], configDir)
 
 
-def initialize_argument_dict() -> Dict[str, Union[str, bool]]:
-    """
-    Initialize the argument dictionary with default values.
+def parse_arguments():
+    argumentDict = {"BIND_IP": '', "HOST_IP": '', "HTTP_PORT": '', "HTTPS_PORT": '', "FULLMAC": '', "MAC": '', "DEBUG": False, "DOCKER": False,
+                    "noLinkButton": False, "noServeHttps": False}
+    ap = argparse.ArgumentParser()
 
-    Returns:
-        dict: The initialized argument dictionary.
-    """
-    argumentDict = defaultdict(lambda: '')
-    argumentDict.update({"DEBUG": False, "DOCKER": False, "noLinkButton": False, "noServeHttps": False})
-    return argumentDict
-
-def add_arguments(ap: argparse.ArgumentParser) -> None:
-    """
-    Add command-line arguments to the argument parser.
-
-    Args:
-        ap (argparse.ArgumentParser): The argument parser.
-    """
+    # Arguements can also be passed as Environment Variables.
     ap.add_argument("--debug", action='store_true', help="Enables debug output")
-    ap.add_argument("--bind-ip", help="The IP address to listen on", type=str, default='0.0.0.0')
-    ap.add_argument("--config_path", help="Set certificate and config files location", type=str, default='/opt/hue-emulator/config')
+    ap.add_argument("--bind-ip", help="The IP address to listen on", type=str)
+    ap.add_argument("--config_path", help="Set certificate and config files location", type=str)
     ap.add_argument("--docker", action='store_true', help="Enables setup for use in docker container")
     ap.add_argument("--ip", help="The IP address of the host system (Docker)", type=str)
-    ap.add_argument("--http-port", help="The port to listen on for HTTP (Docker)", type=int, default=80)
-    ap.add_argument("--https-port", help="The port to listen on for HTTPS (Docker)", type=int, default=443)
+    ap.add_argument("--http-port", help="The port to listen on for HTTP (Docker)", type=int)
+    ap.add_argument("--https-port", help="The port to listen on for HTTPS (Docker)", type=int)
     ap.add_argument("--mac", help="The MAC address of the host system (Docker)", type=str)
     ap.add_argument("--no-serve-https", action='store_true', help="Don't listen on port 443 with SSL")
     ap.add_argument("--ip-range", help="Deprecated use webui, Set IP range for light discovery. Format: <START_IP>,<STOP_IP>", type=str)
     ap.add_argument("--sub-ip-range", help="Deprecated use webui, Set SUB IP range for light discovery. Format: <START_IP>,<STOP_IP>", type=str)
     ap.add_argument("--scan-on-host-ip", action='store_true', help="Deprecated use webui, Scan the local IP address when discovering new lights")
     ap.add_argument("--deconz", help="Deprecated use webui, Provide the IP address of your Deconz host. 127.0.0.1 by default.", type=str)
-    ap.add_argument("--no-link-button", action='store_true', help="DANGEROUS! Don't require the link button to be pressed to pair the Hue app, just allow any app to connect")
+    ap.add_argument("--no-link-button", action='store_true',
+                    help="DANGEROUS! Don't require the link button to be pressed to pair the Hue app, just allow any app to connect")
     ap.add_argument("--disable-online-discover", help="Deprecated use webui, Disable Online and Remote API functions")
     ap.add_argument("--TZ", help="Deprecated use webui, Set time zone", type=str)
 
-def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], args: argparse.Namespace) -> None:
-    """
-    Set arguments from command-line arguments and environment variables.
+    args = ap.parse_args()
 
-    Args:
-        argumentDict (dict): The dictionary to store arguments.
-        args (argparse.Namespace): The parsed command-line arguments.
-    """
+    if args.scan_on_host_ip:
+        logging.warn("scan_on_host_ip is Deprecated in commandline and not active, please setup via webui")
 
-    if args.no_link_button or get_environment_variable('noLinkButton', True):
+    if args.no_link_button:
         argumentDict["noLinkButton"] = True
 
-    if args.no_serve_https or get_environment_variable('noServeHttps', True):
+    if args.no_serve_https:
         argumentDict["noServeHttps"] = True
 
     if args.debug or get_environment_variable('DEBUG', True):
@@ -174,7 +85,10 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
         bind_ip = get_environment_variable('BIND_IP')
     else:
         bind_ip = '0.0.0.0'
-    logging.info(f"Bind IP set to {bind_ip}")
+    argumentDict["BIND_IP"] = bind_ip
+
+    if args.TZ or get_environment_variable('TZ'):
+        logging.warn("Time Zone is Deprecated in commandline and not active, please setup via webui")
 
     if args.ip:
         host_ip = args.ip
@@ -185,8 +99,6 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
     else:
         host_ip = getIpAddress()
     argumentDict["HOST_IP"] = host_ip
-    argumentDict["BIND_IP"] = host_ip if bind_ip == '0.0.0.0' else bind_ip
-    logging.info(f"Bind IP set to {bind_ip}")
 
     if args.http_port:
         host_http_port = args.http_port
@@ -204,89 +116,44 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
         host_https_port = 443
     argumentDict["HTTPS_PORT"] = host_https_port
 
+    logging.info("Using Host %s:%s" % (host_ip, host_http_port))
+    logging.info("Using Host %s:%s" % (host_ip, host_https_port))
+
+    if args.mac and str(args.mac).replace(":", "").capitalize != "XXXXXXXXXXXX":
+        dockerMAC = args.mac  # keeps : for cert generation
+        mac = str(args.mac).replace(":", "")
+    elif get_environment_variable('MAC') and get_environment_variable('MAC').strip('\u200e').replace(":", "").capitalize != "XXXXXXXXXXXX":
+        dockerMAC = get_environment_variable('MAC').strip('\u200e')
+        mac = str(dockerMAC).replace(":", "")
+    else:
+        dockerMAC = check_output("cat /sys/class/net/$(ip -o addr | grep %s | awk '{print $2}')/address" % host_ip,
+                                 shell=True).decode('utf-8')[:-1]
+        mac = str(dockerMAC).replace(":", "")
+
     if args.docker or get_environment_variable('DOCKER', True):
         docker = True
     else:
         docker = False
+    argumentDict["FULLMAC"] = dockerMAC
+    argumentDict["MAC"] = mac
     argumentDict["DOCKER"] = docker
-
-def log_deprecated_warnings(args: argparse.Namespace) -> None:
-    """
-    Log warnings for deprecated command-line arguments.
-
-    Args:
-        args (argparse.Namespace): The parsed command-line arguments.
-    """
-    for arg, warning in DEPRECATED_WARNINGS.items():
-        if getattr(args, arg) or get_environment_variable(arg.upper()):
-            logging.warning(warning)
-
-def get_mac_address(args: argparse.Namespace, argumentDict: Dict[str, Union[str, bool]]) -> Tuple[str, str]:
-    """
-    Retrieve the MAC address based on command-line arguments or environment variables.
-
-    Args:
-        args (argparse.Namespace): The parsed command-line arguments.
-        argumentDict (dict): The dictionary of parsed arguments.
-
-    Returns:
-        tuple: The MAC address and Docker MAC address.
-    """
-    mac = retrieve_mac_from_args_or_env(args, 'mac')
-    if mac:
-        dockerMAC = mac
+    if mac.capitalize == "XXXXXXXXXXXX" or mac == "":
+        logging.exception("No valid MAC address provided " + str(mac))
+        logging.exception("To fix this visit: https://diyhue.readthedocs.io/en/latest/getting_started.html")
+        raise SystemExit("CRITICAL! No valid MAC address provided " + str(mac))
     else:
-        dockerMAC, mac = retrieve_mac_from_system(argumentDict["HOST_IP"])
-    return mac.replace(":", ""), dockerMAC
+        logging.info("Host MAC given as " + mac)
 
-def retrieve_mac_from_args_or_env(args: argparse.Namespace, var: str) -> Optional[str]:
-    """
-    Retrieve the MAC address from command-line arguments or environment variables.
+    if args.ip_range or get_environment_variable('IP_RANGE') or args.sub_ip_range or get_environment_variable('IP_RANGE_START') and get_environment_variable('IP_RANGE_END') or get_environment_variable('SUB_IP_RANGE') or get_environment_variable('SUB_IP_RANGE_START') or get_environment_variable('SUB_IP_RANGE_END'):
+        logging.warn("IP range is Deprecated in commandline and not active, please setup via webui")
 
-    Args:
-        args (argparse.Namespace): The parsed command-line arguments.
-        var (str): The variable name.
+    if args.deconz or get_environment_variable('DECONZ'):
+        logging.warn("DECONZ is Deprecated in commandline and not active, please setup via webui")
 
-    Returns:
-        str: The MAC address.
-    """
-    mac = getattr(args, var)
-    if mac and mac.replace(":", "").capitalize() != "XXXXXXXXXXXX":
-        return mac
-    mac = get_environment_variable(var.upper())
-    if mac and mac.strip('\u200e').replace(":", "").capitalize() != "XXXXXXXXXXXX":
-        return mac.strip('\u200e')
-    return None
+    if args.disable_online_discover or get_environment_variable('disableonlinediscover'):
+        logging.warn("disableonlinediscover is Deprecated in commandline and not active, please setup via webui")
 
-def retrieve_mac_from_system(host_ip: str) -> Tuple[str, str]:
-    """
-    Retrieve the MAC address from the system.
+    if argumentDict['noServeHttps']:
+        logging.info("HTTPS Port Disabled")
 
-    Args:
-        host_ip (str): The host IP address.
-
-    Returns:
-        tuple: The Docker MAC address and MAC address.
-    """
-    result: CompletedProcess = run("cat /sys/class/net/$(ip -o addr | grep %s | awk '{print $2}')/address" % host_ip, shell=True, capture_output=True, text=True)
-    if result.returncode == 0:
-        dockerMAC = result.stdout.strip()
-        mac = dockerMAC.replace(":", "")
-        return dockerMAC, mac
-    else:
-        logging.error("Failed to retrieve MAC address")
-        raise SystemExit("CRITICAL! Failed to retrieve MAC address")
-
-def validate_mac_address(mac: str) -> None:
-    """
-    Validate the provided MAC address.
-
-    Args:
-        mac (str): The MAC address to validate.
-    """
-    if mac.capitalize() == "XXXXXXXXXXXX" or mac == "":
-        logging.error(f"No valid MAC address provided {mac}")
-        logging.error("To fix this visit: https://diyhue.readthedocs.io/en/latest/getting_started.html")
-        raise SystemExit(f"CRITICAL! No valid MAC address provided {mac}")
-    else:
-        logging.info(f"Host MAC given as {mac}")
+    return argumentDict
