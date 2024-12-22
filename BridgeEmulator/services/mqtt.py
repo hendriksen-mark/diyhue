@@ -1,23 +1,24 @@
 import json
 import math
-import weakref
 import ssl
+import weakref
 from datetime import datetime, timezone
 from threading import Thread
 from time import sleep
 from typing import Any, Dict, Optional, Union
-import requests
-import paho.mqtt.client as mqtt
 
-import logManager
+import paho.mqtt.client as mqtt
+import requests
+
 import configManager
+import logManager
 from HueObjects import Sensor
+from functions.behavior_instance import checkBehaviorInstances
 from functions.core import nextFreeId
+from functions.rules import rulesProcessor
+from lights.discover import addNewLight
 from sensors.discover import addHueMotionSensor
 from sensors.sensor_types import sensorTypes
-from lights.discover import addNewLight
-from functions.rules import rulesProcessor
-from functions.behavior_instance import checkBehaviorInstances
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config

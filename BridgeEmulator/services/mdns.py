@@ -1,8 +1,8 @@
-import logManager
 import socket
 import time
+from typing import Dict, List, Optional
 from zeroconf import IPVersion, ServiceInfo, Zeroconf
-from typing import Dict, List
+import logManager
 
 logging = logManager.logger.get_logger(__name__)
 
@@ -11,7 +11,7 @@ class MDNSListener:
     A class to manage mDNS service registration and updates.
     """
 
-    def __init__(self, ip: str, port: int, modelid: str, bridgeid: str):
+    def __init__(self, ip: str, port: int, modelid: str, bridgeid: str) -> None:
         """
         Initialize the MDNSListener with the given parameters.
         
@@ -20,19 +20,19 @@ class MDNSListener:
         :param modelid: Model ID of the service
         :param bridgeid: Bridge ID of the service
         """
-        self.ip = ip
-        self.port = port
-        self.modelid = modelid
-        self.bridgeid = bridgeid
-        self.zeroconf = None
-        self.info = None
-        self.running = False
+        self.ip: str = ip
+        self.port: int = port
+        self.modelid: str = modelid
+        self.bridgeid: str = bridgeid
+        self.zeroconf: Optional[Zeroconf] = None
+        self.info: Optional[ServiceInfo] = None
+        self.running: bool = False
 
-    def __enter__(self):
+    def __enter__(self) -> 'MDNSListener':
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.stop()
 
     def start(self) -> None:

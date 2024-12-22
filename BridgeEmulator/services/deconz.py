@@ -1,17 +1,19 @@
-import requests
-import configManager
-import logManager
-import weakref
-from HueObjects import Sensor
 import json
-from threading import Thread
-from functions.rules import rulesProcessor
-from ws4py.client.threadedclient import WebSocketClient
-from sensors.discover import addHueMotionSensor
-from functions.core import nextFreeId
+import weakref
 from datetime import datetime, timezone
+from threading import Thread
 from time import sleep
 from typing import Union, Dict, Any
+
+import requests
+from ws4py.client.threadedclient import WebSocketClient
+
+import configManager
+import logManager
+from HueObjects import Sensor
+from functions.core import nextFreeId
+from functions.rules import rulesProcessor
+from sensors.discover import addHueMotionSensor
 
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
@@ -19,6 +21,16 @@ devicesIds: Dict[str, Dict[str, weakref.ReferenceType]] = {"sensors": {}, "light
 motionSensors = ["TRADFRI motion sensor", "lumi.sensor_motion", "lumi.vibration.aq1"]
 
 def getObject(resource: str, id: str) -> Union[Sensor.Sensor, bool]:
+    """
+    Retrieve an object from the cache or bridge configuration.
+
+    Args:
+        resource (str): The type of resource (e.g., 'sensors', 'lights').
+        id (str): The ID of the resource.
+
+    Returns:
+        Union[Sensor.Sensor, bool]: The sensor object if found, otherwise False.
+    """
     if id in devicesIds[resource]:
         logging.debug(f"Cache Hit for {resource} {id}")
         return devicesIds[resource][id]()
@@ -32,6 +44,13 @@ def getObject(resource: str, id: str) -> Union[Sensor.Sensor, bool]:
         return False
 
 def longPressButton(sensor: Sensor.Sensor, buttonevent: int) -> None:
+    """
+    Handle long press button events.
+
+    Args:
+        sensor (Sensor.Sensor): The sensor object.
+        buttonevent (int): The button event code.
+    """
     logging.info("Long press detected")
     sleep(1)
     while sensor.state["buttonevent"] == buttonevent:
@@ -43,6 +62,9 @@ def longPressButton(sensor: Sensor.Sensor, buttonevent: int) -> None:
     return
 
 def scanDeconz() -> None:
+    """
+    Scan for deconz sensors and register them in the bridge configuration.
+    """
     deconzConf = bridgeConfig["config"]["deconz"]
     try:
         deconz_config = requests.get(f"http://{deconzConf['deconzHost']}:{deconzConf['deconzPort']}/api/{deconzConf['deconzUser']}/config").json()
@@ -105,6 +127,9 @@ def scanDeconz() -> None:
                 bridgeConfig["sensors"][new_sensor_id] = Sensor.Sensor(sensor)
 
 def websocketClient() -> None:
+    """
+    Establish a WebSocket connection to deconz and process incoming messages.
+    """
     scanDeconz()
     if "websocketport" not in bridgeConfig["config"]["deconz"]:
         return

@@ -1,13 +1,19 @@
-import logManager
-from flask import Response, stream_with_context, Blueprint
 import json
 from time import sleep, time
+
+from flask import Response, stream_with_context, Blueprint
+
 import HueObjects
+import logManager
 
 logging = logManager.logger.get_logger(__name__)
 stream = Blueprint('stream', __name__)
 
-def messageBroker():
+def messageBroker() -> None:
+    """
+    Continuously checks for events in the HueObjects event stream and logs them.
+    Clears the event stream after processing.
+    """
     while True:
         if len(HueObjects.eventstream) > 0:
             for event in HueObjects.eventstream:
@@ -17,8 +23,20 @@ def messageBroker():
         sleep(0.2)
 
 @stream.route('/eventstream/clip/v2')
-def streamV2Events():
+def streamV2Events() -> Response:
+    """
+    Streams events from the HueObjects event stream to the client.
+
+    Returns:
+        Response: A Flask Response object with the event stream.
+    """
     def generate():
+        """
+        Generator function that yields events from the HueObjects event stream.
+
+        Yields:
+            str: Formatted event data.
+        """
         yield f": hi\n\n"
         while True:
             try:

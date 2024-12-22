@@ -1,10 +1,10 @@
-import logManager
+import logging
 import requests
 from time import sleep
 from typing import Dict, Any
 import signal
 
-logging = logManager.logger.get_logger(__name__)
+logging = logging.getLogger(__name__)
 
 ### This service is needed for Hue Essentials to automatically discover the diyhue instance.
 
@@ -12,7 +12,7 @@ SLEEP_INTERVAL = 60
 DISCOVERY_URL = 'https://discovery.diyhue.org'
 running = True
 
-def runRemoteDiscover(config: Dict[str, Any], timeout: int = 5) -> None:
+def run_remote_discover(config: Dict[str, Any], timeout: int = 5) -> None:
     """
     Run the remote discovery service to allow Hue Essentials to discover the diyhue instance.
     
@@ -86,7 +86,14 @@ def handle_unexpected_exception(e: Exception, retry_delay: int) -> None:
     logging.error(f"An unexpected error occurred: {e}. Retrying in {retry_delay} seconds.")
     sleep(retry_delay)
 
-def signal_handler(sig, frame) -> None:
+def signal_handler(sig: int, frame: Any) -> None:
+    """
+    Handle termination signals to stop the discovery service.
+    
+    Args:
+        sig (int): Signal number.
+        frame (Any): Current stack frame.
+    """
     global running
     logging.info("Stopping discovery service")
     running = False

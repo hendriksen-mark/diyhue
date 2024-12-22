@@ -18,6 +18,17 @@ lastAppliedFrame: Dict[str, Dict[str, Union[List[float], int]]] = {}
 YeelightConnections: Dict[str, 'YeelightConnection'] = {}
 
 def skipSimilarFrames(light: str, color: List[float], brightness: int) -> int:
+    """
+    Skip frames if the color or brightness change is below a certain tolerance.
+
+    Args:
+        light (str): The light identifier.
+        color (List[float]): The color in xy format.
+        brightness (int): The brightness level.
+
+    Returns:
+        int: 2 if color change is significant, 1 if brightness change is significant, 0 otherwise.
+    """
     if light not in lastAppliedFrame:  # check if light exists in dictionary
         lastAppliedFrame[light] = {"xy": [0, 0], "bri": 0}
 
@@ -30,6 +41,15 @@ def skipSimilarFrames(light: str, color: List[float], brightness: int) -> int:
     return 0
 
 def getObject(v2uuid: str) -> Optional[object]:
+    """
+    Retrieve the light object based on its v2 UUID.
+
+    Args:
+        v2uuid (str): The v2 UUID of the light.
+
+    Returns:
+        Optional[object]: The light object if found, None otherwise.
+    """
     for key, obj in bridgeConfig["lights"].items():
         if str(uuid.uuid5(uuid.NAMESPACE_URL, obj.id_v2 + 'entertainment')) == v2uuid:
             return obj
@@ -37,12 +57,31 @@ def getObject(v2uuid: str) -> Optional[object]:
     return None
 
 def findGradientStrip(group: object) -> Union[object, str]:
+    """
+    Find a gradient strip light in the group.
+
+    Args:
+        group (object): The group object containing lights.
+
+    Returns:
+        Union[object, str]: The gradient strip light object if found, "not found" otherwise.
+    """
     for light in group.lights:
         if light().modelid in ["LCX001", "LCX002", "LCX003", "915005987201", "LCX004"]:
             return light()
     return "not found"
 
 def get_hue_entertainment_group(light: object, groupname: str) -> int:
+    """
+    Get the entertainment group ID for a given light and group name.
+
+    Args:
+        light (object): The light object.
+        groupname (str): The name of the group.
+
+    Returns:
+        int: The entertainment group ID if found, -1 otherwise.
+    """
     try:
         group = requests.get(f"http://{light.protocol_cfg['ip']}/api/{light.protocol_cfg['hueUser']}/groups/", timeout=3)
         groups = group.json()
@@ -55,6 +94,13 @@ def get_hue_entertainment_group(light: object, groupname: str) -> int:
     return -1
 
 def entertainmentService(group: object, user: object) -> None:
+    """
+    Start the entertainment service for a group and user.
+
+    Args:
+        group (object): The group object.
+        user (object): The user object.
+    """
     logging.debug(f"User: {user.username}")
     logging.debug(f"Key: {user.client_key}")
     bridgeConfig["groups"][group.id_v1].stream["owner"] = user.username
@@ -303,6 +349,13 @@ def entertainmentService(group: object, user: object) -> None:
         logging.info("Entertainment service stopped")
 
 def enableMusic(ip: str, host_ip: str) -> None:
+    """
+    Enable music mode for a Yeelight device.
+
+    Args:
+        ip (str): The IP address of the Yeelight device.
+        host_ip (str): The IP address of the host.
+    """
     if ip in YeelightConnections:
         c = YeelightConnections[ip]
         if not c._music:
@@ -313,19 +366,40 @@ def enableMusic(ip: str, host_ip: str) -> None:
         c.enableMusic(host_ip)
 
 def disableMusic(ip: str) -> None:
+    """
+    Disable music mode for a Yeelight device.
+
+    Args:
+        ip (str): The IP address of the Yeelight device.
+    """
     if ip in YeelightConnections:
         YeelightConnections[ip].disableMusic()
 
 class YeelightConnection:
+    """
+    A class to manage connections to Yeelight devices.
+    """
     _music = False
     _connected = False
     _socket: Optional[socket.socket] = None
     _host_ip = ""
 
     def __init__(self, ip: str):
+        """
+        Initialize the YeelightConnection.
+
+        Args:
+            ip (str): The IP address of the Yeelight device.
+        """
         self._ip = ip
 
     def connect(self, simple: bool = False) -> None:
+        """
+        Connect to the Yeelight device.
+
+        Args:
+            simple (bool): Whether to use a simple connection without music mode.
+        """
         self.disconnect()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(5)
@@ -336,12 +410,21 @@ class YeelightConnection:
             self._connected = True
 
     def disconnect(self) -> None:
+        """
+        Disconnect from the Yeelight device.
+        """
         self._connected = False
         if self._socket:
             self._socket.close()
         self._socket = None
 
     def enableMusic(self, host_ip: str) -> None:
+        """
+        Enable music mode on the Yeelight device.
+
+        Args:
+            host_ip (str): The IP address of the host.
+        """
         if self._connected and self._music:
             raise AssertionError("Already in music mode!")
 
@@ -372,6 +455,9 @@ class YeelightConnection:
         logging.info(f"Yeelight device with IP {self._ip} is now in music mode")
 
     def disableMusic(self) -> None:
+        """
+        Disable music mode on the Yeelight device.
+        """
         if not self._music:
             return
 
@@ -382,6 +468,13 @@ class YeelightConnection:
         logging.info(f"Yeelight device with IP {self._ip} is no longer using music mode")
 
     def send(self, data: bytes, flags: int = 0) -> None:
+        """
+        Send data to the Yeelight device.
+
+        Args:
+            data (bytes): The data to send.
+            flags (int): Optional flags for the send operation.
+        """
         try:
             if not self._connected:
                 self.connect()
@@ -391,6 +484,16 @@ class YeelightConnection:
             raise e
 
     def recv(self, bufsize: int, flags: int = 0) -> bytes:
+        """
+        Receive data from the Yeelight device.
+
+        Args:
+            bufsize (int): The buffer size for receiving data.
+            flags (int): Optional flags for the receive operation.
+
+        Returns:
+            bytes: The received data.
+        """
         try:
             if not self._connected:
                 self.connect()
@@ -400,6 +503,13 @@ class YeelightConnection:
             raise e
 
     def command(self, api_method: str, param: List[Union[int, str]]) -> None:
+        """
+        Send a command to the Yeelight device.
+
+        Args:
+            api_method (str): The API method to call.
+            param (List[Union[int, str]]): The parameters for the API method.
+        """
         try:
             msg = json.dumps({"id": 1, "method": api_method, "params": param}) + "\r\n"
             self.send(msg.encode())
@@ -407,6 +517,9 @@ class YeelightConnection:
             logging.warning("Yeelight command error: %s", e)
 
 class HueConnection:
+    """
+    A class to manage connections to Hue bridges.
+    """
     _connected = False
     _ip = ""
     _entGroup = -1
@@ -414,9 +527,22 @@ class HueConnection:
     _hueLights = []
 
     def __init__(self, ip: str):
+        """
+        Initialize the HueConnection.
+
+        Args:
+            ip (str): The IP address of the Hue bridge.
+        """
         self._ip = ip
 
     def connect(self, hueGroup: int, *lights: List[Tuple[int, List[int]]]) -> None:
+        """
+        Connect to the Hue bridge and start the entertainment stream.
+
+        Args:
+            hueGroup (int): The entertainment group ID.
+            lights (List[Tuple[int, List[int]]]): The lights in the group.
+        """
         self._entGroup = hueGroup
         self._hueLights = lights
         self.disconnect()
@@ -441,6 +567,9 @@ class HueConnection:
             self.disconnect()
 
     def disconnect(self) -> None:
+        """
+        Disconnect from the Hue bridge and stop the entertainment stream.
+        """
         try:
             url = f"http://{self._ip}/api/{bridgeConfig['config']['hue']['hueUser']}/groups/{self._entGroup}"
             if self._connected:
@@ -451,6 +580,13 @@ class HueConnection:
             pass
 
     def send(self, lights: Dict[int, List[int]], hueGroup: int) -> None:
+        """
+        Send light data to the Hue bridge.
+
+        Args:
+            lights (Dict[int, List[int]]): The light data to send.
+            hueGroup (int): The entertainment group ID.
+        """
         arr = bytearray("HueStream", 'ascii')
         msg = [
                 1, 0,     #Api version

@@ -1,40 +1,82 @@
-import logManager
-import configManager
 import json
 import random
-from time import sleep
-from threading import Thread
+from copy import deepcopy
 from datetime import datetime, timedelta, time, timezone
-from functions.request import sendRequest
+from threading import Thread
+from time import sleep
+from typing import Any, Tuple
+
+import configManager
+import logManager
+from flaskUI.v2restapi import getObject
 from functions.daylightSensor import daylightSensor
+from functions.request import sendRequest
 from functions.scripts import findGroup, triggerScript
 from services import updateManager
-from flaskUI.v2restapi import getObject
-from copy import deepcopy
-from typing import Any, Dict, Tuple
 
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
 
 def execute_schedule(schedule: str, obj: Any, delay: int) -> None:
+    """
+    Execute a schedule command with a specified delay.
+
+    Args:
+        schedule (str): The schedule identifier.
+        obj (Any): The schedule object containing command details.
+        delay (int): The delay in seconds before executing the command.
+    """
     logging.info(f"execute schedule: {schedule} with delay {delay}")
     sendRequest(obj.command["address"], obj.command["method"], json.dumps(obj.command["body"]), 1, delay)
 
 def execute_timer(schedule: str, obj: Any, delay: int) -> None:
+    """
+    Execute a timer command with a specified delay.
+
+    Args:
+        schedule (str): The schedule identifier.
+        obj (Any): The timer object containing command details.
+        delay (int): The delay in seconds before executing the command.
+    """
     logging.info(f"execute timer: {schedule} with delay {delay}")
     sendRequest(obj.command["address"], obj.command["method"], json.dumps(obj.command["body"]), 1, delay)
 
 def check_time_match(time_object: datetime) -> bool:
+    """
+    Check if the current time matches the given time object.
+
+    Args:
+        time_object (datetime): The time object to match against the current time.
+
+    Returns:
+        bool: True if the current time matches the time object, False otherwise.
+    """
     now = datetime.now()
     return now.second == time_object.second and now.minute == time_object.minute and now.hour == time_object.hour
 
 def get_schedule_time(obj: Any) -> Tuple[str, int]:
+    """
+    Get the schedule time and delay from the schedule object.
+
+    Args:
+        obj (Any): The schedule object containing time details.
+
+    Returns:
+        Tuple[str, int]: The schedule time string and delay in seconds.
+    """
     if obj.localtime[-9:-8] == "A":
         delay = random.randrange(0, int(obj.localtime[-8:-6]) * 3600 + int(obj.localtime[-5:-3]) * 60 + int(obj.localtime[-2:]))
         return obj.localtime[:-9], delay
     return obj.localtime, 0
 
 def process_schedule(schedule: str, obj: Any) -> None:
+    """
+    Process and execute the schedule based on its configuration.
+
+    Args:
+        schedule (str): The schedule identifier.
+        obj (Any): The schedule object containing configuration details.
+    """
     schedule_time, delay = get_schedule_time(obj)
     if obj.status == "enabled":
         if schedule_time.startswith("W"):
@@ -63,6 +105,13 @@ def process_schedule(schedule: str, obj: Any) -> None:
                     del obj
 
 def process_behavior_instance(instance: str, obj: Any) -> None:
+    """
+    Process and execute the behavior instance based on its configuration.
+
+    Args:
+        instance (str): The behavior instance identifier.
+        obj (Any): The behavior instance object containing configuration details.
+    """
     if obj.enabled:
         if "when" in obj.configuration:
             if "recurrence_days" in obj.configuration["when"]:
@@ -119,6 +168,13 @@ def process_behavior_instance(instance: str, obj: Any) -> None:
                 Thread(target=triggerScript, args=[obj]).start()
 
 def process_smart_scene(smartscene: str, obj: Any) -> None:
+    """
+    Process and execute the smart scene based on its configuration.
+
+    Args:
+        smartscene (str): The smart scene identifier.
+        obj (Any): The smart scene object containing configuration details.
+    """
     if hasattr(obj, "timeslots"):
         sunset_slot = -1
         sunset = bridgeConfig["sensors"]["1"].config["sunset"] if "lat" in bridgeConfig["sensors"]["1"].protocol_cfg else "21:00:00"
@@ -164,6 +220,9 @@ def process_smart_scene(smartscene: str, obj: Any) -> None:
                     target_object.activate(putDict)
 
 def runScheduler() -> None:
+    """
+    Run the scheduler to process schedules, behavior instances, and smart scenes.
+    """
     while True:
         for schedule, obj in bridgeConfig["schedules"].items():
             try:

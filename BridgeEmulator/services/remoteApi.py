@@ -1,20 +1,19 @@
-import logManager
-import requests
 import base64
-import urllib.parse
 import json
+import requests
 from time import sleep
 from typing import Dict, Any, Optional
+import logManager
 
 logging = logManager.logger.get_logger(__name__)
 
 def runRemoteApi(BIND_IP: str, config: Dict[str, Any]) -> None:
     """
     Runs the remote API service to communicate with the remote server.
-    
+
     Args:
         BIND_IP (str): The IP address to bind to.
-        config (dict): Configuration dictionary containing API keys and settings.
+        config (Dict[str, Any]): Configuration dictionary containing API keys and settings.
     """
     ip = "localhost" if BIND_IP == '' else BIND_IP
     url = 'https://remote.diyhue.org/devices'
@@ -28,11 +27,11 @@ def runRemoteApi(BIND_IP: str, config: Dict[str, Any]) -> None:
     def send_request(method: str, address: str, body: Optional[Dict[str, Any]] = None) -> None:
         """
         Sends a request to the bridge and posts the response to the remote server.
-        
+
         Args:
             method (str): HTTP method ('GET', 'POST', 'PUT').
             address (str): The address to send the request to.
-            body (dict, optional): The body of the request for POST and PUT methods.
+            body (Optional[Dict[str, Any]], optional): The body of the request for POST and PUT methods.
         """
         try:
             if method == 'GET':

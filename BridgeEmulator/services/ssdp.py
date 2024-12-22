@@ -1,12 +1,21 @@
-import logManager
 import random
 import socket
 import struct
 from time import sleep
 
+import logManager
+
 logging = logManager.logger.get_logger(__name__)
 
-def ssdpSearch(ip, port, mac):
+def ssdpSearch(ip: str, port: int, mac: str) -> None:
+    """
+    Perform SSDP search and respond to M-SEARCH requests.
+
+    Args:
+        ip (str): The IP address of the device.
+        port (int): The port number of the device.
+        mac (str): The MAC address of the device.
+    """
     SSDP_ADDR = '239.255.255.250'
     SSDP_PORT = 1900
     multicast_group_c = SSDP_ADDR
@@ -29,9 +38,9 @@ def ssdpSearch(ip, port, mac):
         while True:
             data, address = sock.recvfrom(1024)
             data = data.decode('utf-8')
-            if data[0:19]== 'M-SEARCH * HTTP/1.1':
+            if data[0:19] == 'M-SEARCH * HTTP/1.1':
                 if data.find("ssdp:discover") != -1:
-                    sleep(random.randrange(1, 10)/10)
+                    sleep(random.randrange(1, 10) / 10)
                     logging.debug("Sending M-Search response to " + address[0])
                     for x in range(3):
                         sock.sendto(bytes(Response_message + "ST: " + custom_response_message[x]["st"] + "\r\nUSN: " + custom_response_message[x]["usn"] + "\r\n\r\n", "utf8"), address)
@@ -40,7 +49,15 @@ def ssdpSearch(ip, port, mac):
         logging.error("ssdp error: " + str(type(e).__name__) + " " + str(e))
 
 
-def ssdpBroadcast(ip, port, mac):
+def ssdpBroadcast(ip: str, port: int, mac: str) -> None:
+    """
+    Broadcast SSDP NOTIFY messages.
+
+    Args:
+        ip (str): The IP address of the device.
+        port (int): The port number of the device.
+        mac (str): The MAC address of the device.
+    """
     logging.info("start ssdp broadcast")
     SSDP_ADDR = '239.255.255.250'
     SSDP_PORT = 1900
@@ -49,7 +66,7 @@ def ssdpBroadcast(ip, port, mac):
     message = 'NOTIFY * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nCACHE-CONTROL: max-age=100\r\nLOCATION: http://' + ip + ':' + str(port) + '/description.xml\r\nSERVER: Linux/3.14.0 UPnP/1.0 IpBridge/1.20.0\r\nNTS: ssdp:alive\r\nhue-bridgeid: ' + (mac[:6] + 'FFFE' + mac[6:]).upper() + '\r\n'
     custom_message = {0: {"nt": "upnp:rootdevice", "usn": "uuid:2f402f80-da50-11e1-9b23-" + mac + "::upnp:rootdevice"}, 1: {"nt": "uuid:2f402f80-da50-11e1-9b23-" + mac, "usn": "uuid:2f402f80-da50-11e1-9b23-" + mac}, 2: {"nt": "urn:schemas-upnp-org:device:basic:1", "usn": "uuid:2f402f80-da50-11e1-9b23-" + mac}}
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.settimeout(MSEARCH_Interval+0.5)
+    sock.settimeout(MSEARCH_Interval + 0.5)
     ttl = struct.pack('b', 1)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
     while True:
