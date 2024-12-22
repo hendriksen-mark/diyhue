@@ -103,20 +103,6 @@ def configure_logging(debug: bool) -> None:
         logManager.logger.configure_logger("INFO")
         logging.info("Debug logging disabled!")
 
-def set_argument(argumentDict: Dict[str, Union[str, bool]], key: str, arg_value: Optional[Union[str, bool]], env_var: str, default: Optional[Union[str, bool]] = None, boolean: bool = False) -> None:
-    """
-    Set an argument value in the argument dictionary.
-
-    Args:
-        argumentDict (dict): The dictionary to store arguments.
-        key (str): The key for the argument.
-        arg_value: The value from the command-line argument.
-        env_var (str): The environment variable name.
-        default: The default value if neither arg_value nor env_var is set.
-        boolean (bool): Whether to interpret the value as a boolean.
-    """
-    value = arg_value if arg_value else get_environment_variable(env_var, boolean)
-    argumentDict[key] = value if value else default
 
 def initialize_argument_dict() -> Dict[str, Union[str, bool]]:
     """
@@ -161,15 +147,63 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
         argumentDict (dict): The dictionary to store arguments.
         args (argparse.Namespace): The parsed command-line arguments.
     """
-    set_argument(argumentDict, "DEBUG", args.debug, 'DEBUG', False, True)
-    set_argument(argumentDict, "CONFIG_PATH", args.config_path, 'CONFIG_PATH')
-    set_argument(argumentDict, "BIND_IP", args.bind_ip, 'BIND_IP')
-    set_argument(argumentDict, "HOST_IP", args.ip, 'IP', getIpAddress() if argumentDict["BIND_IP"] == '0.0.0.0' else argumentDict["BIND_IP"])
-    set_argument(argumentDict, "HTTP_PORT", args.http_port, 'HTTP_PORT')
-    set_argument(argumentDict, "HTTPS_PORT", args.https_port, 'HTTPS_PORT')
-    set_argument(argumentDict, "noLinkButton", args.no_link_button, 'noLinkButton', False, True)
-    set_argument(argumentDict, "noServeHttps", args.no_serve_https, 'noServeHttps', False, True)
-    set_argument(argumentDict, "DOCKER", args.docker, 'DOCKER', False, True)
+
+    if args.no_link_button or get_environment_variable('noLinkButton', True):
+        argumentDict["noLinkButton"] = True
+
+    if args.no_serve_https or get_environment_variable('noServeHttps', True):
+        argumentDict["noServeHttps"] = True
+
+    if args.debug or get_environment_variable('DEBUG', True):
+        argumentDict["DEBUG"] = True
+
+    if args.config_path:
+        config_path = args.config_path
+    elif get_environment_variable('CONFIG_PATH'):
+        config_path = get_environment_variable('CONFIG_PATH')
+    else:
+        config_path = '/opt/hue-emulator/config'
+    argumentDict["CONFIG_PATH"] = config_path
+
+    if args.bind_ip:
+        bind_ip = args.bind_ip
+    elif get_environment_variable('BIND_IP'):
+        bind_ip = get_environment_variable('BIND_IP')
+    else:
+        bind_ip = '0.0.0.0'
+    argumentDict["BIND_IP"] = bind_ip
+
+    if args.ip:
+        host_ip = args.ip
+    elif get_environment_variable('IP'):
+        host_ip = get_environment_variable('IP')
+    elif bind_ip != '0.0.0.0':
+        host_ip = bind_ip
+    else:
+        host_ip = getIpAddress()
+    argumentDict["HOST_IP"] = host_ip
+
+    if args.http_port:
+        host_http_port = args.http_port
+    elif get_environment_variable('HTTP_PORT'):
+        host_http_port = int(get_environment_variable('HTTP_PORT'))
+    else:
+        host_http_port = 80
+    argumentDict["HTTP_PORT"] = host_http_port
+
+    if args.https_port:
+        host_https_port = args.https_port
+    elif get_environment_variable('HTTPS_PORT'):
+        host_https_port = int(get_environment_variable('HTTPS_PORT'))
+    else:
+        host_https_port = 443
+    argumentDict["HTTPS_PORT"] = host_https_port
+
+    if args.docker or get_environment_variable('DOCKER', True):
+        docker = True
+    else:
+        docker = False
+    argumentDict["DOCKER"] = docker
 
 def log_deprecated_warnings(args: argparse.Namespace) -> None:
     """
