@@ -45,12 +45,12 @@ class Rule:
 
     def update_attr(self, newdata: Dict[str, Any]) -> None:
         for key, value in newdata.items():
-            if hasattr(self, key):
-                current_attr = getattr(self, key)
-                if isinstance(current_attr, dict):
-                    current_attr.update(value)
-                else:
-                    setattr(self, key, value)
+            updateAttribute = getattr(self, key)
+            if isinstance(updateAttribute, dict):
+                updateAttribute.update(value)
+                setattr(self, key, updateAttribute)
+            else:
+                setattr(self, key, value)
 
     def save(self) -> Dict[str, Any]:
         return self.getV1Api()
