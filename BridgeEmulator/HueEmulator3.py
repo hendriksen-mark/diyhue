@@ -103,8 +103,6 @@ def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
     ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
     ctx.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256')
     ctx.set_ecdh_curve('prime256v1')
-    ctx.check_hostname = False  # Disable hostname checking
-    ctx.verify_mode = ssl.CERT_NONE  # Disable certificate verification
     try:
         app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
     except ssl.SSLError as ssl_error:
