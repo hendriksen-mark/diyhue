@@ -1,267 +1,212 @@
 import uuid
+from datetime import datetime, timezone
+from copy import deepcopy
+from typing import Any, Dict, Optional
+
 import logManager
 from sensors.sensor_types import sensorTypes
 from HueObjects import genV2Uuid, StreamEvent
-from datetime import datetime, timezone
-from copy import deepcopy
 
 logging = logManager.logger.get_logger(__name__)
 
-class Sensor():
-    def __init__(self, data):
+class Sensor:
+    def __init__(self, data: Dict[str, Any]) -> None:
         if data["modelid"] in sensorTypes:
-            if "manufacturername" not in data:
-                data["manufacturername"] = sensorTypes[data["modelid"]
-                                                       ][data["type"]]["static"]["manufacturername"]
-            if "config" not in data:
-                data["config"] = deepcopy(
-                    sensorTypes[data["modelid"]][data["type"]]["config"])
-            if "state" not in data:
-                data["state"] = deepcopy(
-                    sensorTypes[data["modelid"]][data["type"]]["state"])
-            if "swversion" not in data:
-                data["swversion"] = sensorTypes[data["modelid"]
-                                                ][data["type"]]["static"]["swversion"]
-        if "config" not in data:
-            data["config"] = {}
-        if "reachable" not in data["config"]:
-            data["config"]["reachable"] = True
-        if "on" not in data["config"]:
-            data["config"]["on"] = True
-        if "state" not in data:
-            data["state"] = {}
-        if "lastupdated" not in data["state"]:
-            data["state"]["lastupdated"] = "none"
+            sensor_type = sensorTypes[data["modelid"]][data["type"]]
+            data.setdefault("manufacturername", sensor_type["static"]["manufacturername"])
+            data.setdefault("config", deepcopy(sensor_type["config"]))
+            data.setdefault("state", deepcopy(sensor_type["state"]))
+            data.setdefault("swversion", sensor_type["static"]["swversion"])
+        
+        data.setdefault("config", {})
+        data["config"].setdefault("reachable", True)
+        data["config"].setdefault("on", True)
+        data.setdefault("state", {})
+        data["state"].setdefault("lastupdated", "none")
+
         self.name = data["name"]
         self.id_v1 = data["id_v1"]
-        self.id_v2 = data["id_v2"] if "id_v2" in data else genV2Uuid()
+        self.id_v2 = data.get("id_v2", genV2Uuid())
         self.config = data["config"]
         self.modelid = data["modelid"]
-        self.manufacturername = data["manufacturername"] if "manufacturername" in data else "Philips"
-        self.protocol = data["protocol"] if "protocol" in data else "none"
-        self.protocol_cfg = data["protocol_cfg"] if "protocol_cfg" in data else {
-        }
+        self.manufacturername = data.get("manufacturername", "Philips")
+        self.protocol = data.get("protocol", "none")
+        self.protocol_cfg = data.get("protocol_cfg", {})
         self.type = data["type"]
         self.state = data["state"]
-        dxstate = {}
-        for state in data["state"].keys():
-            dxstate[state] = datetime.now()
-        self.dxState = dxstate
-        self.swversion = data["swversion"] if "swversion" in data else None
-        self.recycle = data["recycle"] if "recycle" in data else False
-        self.uniqueid = data["uniqueid"] if "uniqueid" in data else None
-        if self.getDevice() != None:
-            streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                             "data": [{"id": self.id_v2, "type": "device"}],
-                             "id": str(uuid.uuid4()),
-                             "type": "add"
-                             }
+        self.dxState = {state: datetime.now() for state in data["state"].keys()}
+        self.swversion = data.get("swversion")
+        self.recycle = data.get("recycle", False)
+        self.uniqueid = data.get("uniqueid")
+
+        if self.getDevice() is not None:
+            streamMessage = {
+                "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "data": [{"id": self.id_v2, "type": "device"}],
+                "id": str(uuid.uuid4()),
+                "type": "add"
+            }
             streamMessage["data"][0].update(self.getDevice())
             StreamEvent(streamMessage)
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self.modelid in ["SML001", "RWL022"]:
-            streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.getDevice()["id"], "type": "device"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
+            streamMessage = {
+                "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "data": [{"id": self.getDevice()["id"], "type": "device"}],
+                "id": str(uuid.uuid4()),
+                "type": "delete"
+            }
             streamMessage["id_v1"] = "/sensors/" + self.id_v1
             StreamEvent(streamMessage)
         logging.info(self.name + " sensor was destroyed.")
 
-    def setV1State(self, state):
+    def setV1State(self, state: Dict[str, Any]) -> None:
         self.state.update(state)
 
-    def getBridgeHome(self):
+    def getBridgeHome(self) -> Dict[str, str]:
         if self.modelid == "SML001":
-            if self.type == "ZLLPresence":
-                rtype = "motion"
-            elif self.type == "ZLLLightLevel":
-                rtype = "light_level"
-            elif self.type == "ZLLTemperature":
-                rtype = "temperature"
-            return {
-                "rid": self.id_v2,
-                "rtype": rtype
-            }
-        else:
-            return {
-                "rid": self.id_v2,
-                "rtype": 'device'
-            }
-        return False
+            rtype = {
+                "ZLLPresence": "motion",
+                "ZLLLightLevel": "light_level",
+                "ZLLTemperature": "temperature"
+            }.get(self.type, 'device')
+            return {"rid": self.id_v2, "rtype": rtype}
+        return {"rid": self.id_v2, "rtype": 'device'}
 
-    def getV1Api(self):
-        result = {}
-        if self.modelid in sensorTypes:
-            result = sensorTypes[self.modelid][self.type]["static"]
-        result["state"] = self.state
-        if self.config != None:
-            result["config"] = self.config
-        result["name"] = self.name
-        result["type"] = self.type
-        result["modelid"] = self.modelid
-        result["manufacturername"] = self.manufacturername
-        if self.swversion != None:
-            result["swversion"] = self.swversion
-        if self.uniqueid != None:
-            result["uniqueid"] = self.uniqueid
-        if self.recycle == True:
-            result["recycle"] = self.recycle
+    def getV1Api(self) -> Dict[str, Any]:
+        result = sensorTypes.get(self.modelid, {}).get(self.type, {}).get("static", {})
+        result.update({
+            "state": self.state,
+            "config": self.config,
+            "name": self.name,
+            "type": self.type,
+            "modelid": self.modelid,
+            "manufacturername": self.manufacturername,
+            "swversion": self.swversion,
+            "uniqueid": self.uniqueid,
+            "recycle": self.recycle
+        })
         return result
 
-    def getObjectPath(self):
+    def getObjectPath(self) -> Dict[str, str]:
         return {"resource": "sensors", "id": self.id_v1}
 
-    def getDevice(self):
-        result = None
+    def getDevice(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "SML001" and self.type == "ZLLPresence":
-            result = {"id": self.id_v2, "id_v1": "/sensors/" + self.id_v1, "type": "device"}
-            result["identify"] = {}
-            result["metadata"] = {
-                "archetype": "unknown_archetype",
-                "name": self.name
-            }
-            result["product_data"] = {
-                "certified": True,
-                "manufacturer_name": "Signify Netherlands B.V.",
-                "model_id": self.modelid,
-                "product_archetype": "unknown_archetype",
-                "product_name": "Hue motion sensor",
-                "software_version": "1.1.27575"
-            }
-            result["services"] = [
-                {
-                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'motion')),
-                    "rtype": "motion"
+            return {
+                "id": self.id_v2,
+                "id_v1": "/sensors/" + self.id_v1,
+                "type": "device",
+                "identify": {},
+                "metadata": {"archetype": "unknown_archetype", "name": self.name},
+                "product_data": {
+                    "certified": True,
+                    "manufacturer_name": "Signify Netherlands B.V.",
+                    "model_id": self.modelid,
+                    "product_archetype": "unknown_archetype",
+                    "product_name": "Hue motion sensor",
+                    "software_version": "1.1.27575"
                 },
-                {
-                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
-                    "rtype": "device_power"
+                "services": [
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'motion')), "rtype": "motion"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')), "rtype": "device_power"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')), "rtype": "zigbee_connectivity"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'light_level')), "rtype": "light_level"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'temperature')), "rtype": "temperature"}
+                ]
+            }
+        elif self.modelid in ["RWL022", "RWL021", "RWL020"]:
+            return {
+                "id": self.id_v2,
+                "id_v1": "/sensors/" + self.id_v1,
+                "type": "device",
+                "identify": {},
+                "metadata": {"archetype": "unknown_archetype", "name": self.name},
+                "product_data": {
+                    "model_id": self.modelid,
+                    "manufacturer_name": "Signify Netherlands B.V.",
+                    "product_name": "Hue dimmer switch",
+                    "product_archetype": "unknown_archetype",
+                    "certified": True,
+                    "software_version": "2.44.0",
+                    "hardware_platform_type": "100b-119"
                 },
-                {
-                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')),
-                    "rtype": "zigbee_connectivity"
+                "services": [
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button1')), "rtype": "button"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button2')), "rtype": "button"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button3')), "rtype": "button"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button4')), "rtype": "button"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')), "rtype": "device_power"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')), "rtype": "zigbee_connectivity"}
+                ]
+            }
+        elif self.modelid == "RDM002":
+            services = [
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button1')), "rtype": "button"},
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button2')), "rtype": "button"},
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button3')), "rtype": "button"},
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button4')), "rtype": "button"},
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')), "rtype": "device_power"},
+                {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')), "rtype": "zigbee_connectivity"}
+            ]
+            if self.type == "ZLLRelativeRotary":
+                services = [
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'relative_rotary')), "rtype": "relative_rotary"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')), "rtype": "device_power"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')), "rtype": "zigbee_connectivity"}
+                ]
+            return {
+                "id": self.id_v2,
+                "id_v1": "/sensors/" + self.id_v1,
+                "type": "device",
+                "identify": {},
+                "metadata": {"archetype": "unknown_archetype", "name": self.name},
+                "product_data": {
+                    "model_id": self.modelid,
+                    "manufacturer_name": "Signify Netherlands B.V.",
+                    "product_name": "Hue tap dial switch",
+                    "product_archetype": "unknown_archetype",
+                    "certified": True,
+                    "software_version": "2.59.25",
+                    "hardware_platform_type": "100b-119"
                 },
-                {
-                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'light_level')),
-                    "rtype": "light_level"
+                "services": services
+            }
+        elif self.modelid == "SOC001":
+            return {
+                "id": self.id_v2,
+                "id_v1": "/sensors/" + self.id_v1,
+                "type": "device",
+                "identify": {},
+                "metadata": {"archetype": "unknown_archetype", "name": self.name},
+                "product_data": {
+                    "model_id": self.modelid,
+                    "manufacturer_name": "Signify Netherlands B.V.",
+                    "product_name": "Hue secure contact sensor",
+                    "product_archetype": "unknown_archetype",
+                    "certified": True,
+                    "software_version": "2.67.9",
+                    "hardware_platform_type": "100b-125"
                 },
-                {
-                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'temperature')),
-                    "rtype": "temperature"
-                }]
-            result["type"] = "device"
-        elif self.modelid == "RWL022" or self.modelid == "RWL021" or self.modelid == "RWL020":
-            result = {"id": self.id_v2, "id_v1": "/sensors/" + self.id_v1, "type": "device"}
-            result["identify"] = {}
-            result["product_data"] = {"model_id": self.modelid,
-                "manufacturer_name": "Signify Netherlands B.V.",
-                "product_name": "Hue dimmer switch",
-                "product_archetype": "unknown_archetype",
-                "certified": True,
-                "software_version": "2.44.0",
-                "hardware_platform_type": "100b-119"
+                "services": [
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'contact')), "rtype": "contact"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')), "rtype": "device_power"},
+                    {"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')), "rtype": "zigbee_connectivity"}
+                ]
             }
-            result["metadata"] = {
-                "archetype": "unknown_archetype",
-                "name": self.name
-            }
-            result["services"] = [{
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button1')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button2')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button3')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button4')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
-                "rtype": "device_power"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')),
-                "rtype": "zigbee_connectivity"
-                }]
-            result["type"] = "device"
-        elif self.modelid == "RDM002" and self.type != "ZLLRelativeRotary":
-            result = {"id": self.id_v2, "id_v1": "/sensors/" + self.id_v1, "type": "device"}
-            result["identify"] = {}
-            result["product_data"] = {"model_id": self.modelid,
-                "manufacturer_name": "Signify Netherlands B.V.",
-                "product_name": "Hue tap dial switch",
-                "product_archetype": "unknown_archetype",
-                "certified": True,
-                "software_version": "2.59.25",
-                "hardware_platform_type": "100b-119"
-            }
-            result["metadata"] = {
-                "archetype": "unknown_archetype",
-                "name": self.name
-            }
-            result["services"] = [{
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button1')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button2')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button3')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button4')),
-                "rtype": "button"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
-                "rtype": "device_power"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')),
-                "rtype": "zigbee_connectivity"
-                }]
-            result["type"] = "device"
-        elif self.modelid == "RDM002" and self.type == "ZLLRelativeRotary":
-            result = {"id": self.id_v2, "id_v1": "/sensors/" + self.id_v1, "type": "device"}
-            result["identify"] = {}
-            result["product_data"] = {"model_id": self.modelid,
-                "manufacturer_name": "Signify Netherlands B.V.",
-                "product_name": "Hue tap dial switch",
-                "product_archetype": "unknown_archetype",
-                "certified": True,
-                "software_version": "2.59.25",
-                "hardware_platform_type": "100b-119"
-            }
-            result["metadata"] = {
-                "archetype": "unknown_archetype",
-                "name": self.name
-            }
-            result["services"] = [{
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'relative_rotary')),
-                "rtype": "relative_rotary"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
-                "rtype": "device_power"
-                }, {
-                "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')),
-                "rtype": "zigbee_connectivity"
-                }]
-            result["type"] = "device"
-        return result
+        return None
 
-    def getMotion(self):
-        result = None
+    def getMotion(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "SML001" and self.type == "ZLLPresence":
-            result = {
+            return {
                 "enabled": self.config["on"],
                 "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'motion')),
                 "id_v1": "/sensors/" + self.id_v1,
                 "motion": {
                     "motion_report": {
                         "changed": self.state["lastupdated"],
-                        "motion": True if self.state["presence"] else False,
+                        "motion": bool(self.state["presence"]),
                     }
                 },
                 "sensitivity": {
@@ -273,38 +218,38 @@ class Sensor():
                     "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device')),
                     "rtype": "device"
                 },
-                "type": "motion"}
-        return result
-    
-    def getTemperature(self):
-        result = None
+                "type": "motion"
+            }
+        return None
+
+    def getTemperature(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "SML001" and self.type == "ZLLTemperature":
-            result = {
+            return {
                 "enabled": self.config["on"],
                 "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'temperature')),
                 "id_v1": "/sensors/" + self.id_v1,
                 "temperature": {
-                    "temperature_report":{
+                    "temperature_report": {
                         "changed": self.state["lastupdated"],
-                        "temperature": self.state["temperature"]/100 if type(self.state["temperature"]) == int else self.state["temperature"]
+                        "temperature": self.state["temperature"] / 100 if isinstance(self.state["temperature"], int) else self.state["temperature"]
                     }
                 },
                 "owner": {
                     "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device')),
                     "rtype": "device"
                 },
-                "type": "temperature"}
-        return result
-    
-    def getLightlevel(self):
-        result = None
+                "type": "temperature"
+            }
+        return None
+
+    def getLightlevel(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "SML001" and self.type == "ZLLLightLevel":
-            result = {
+            return {
                 "enabled": self.config["on"],
                 "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'light_level')),
                 "id_v1": "/sensors/" + self.id_v1,
                 "light": {
-                    "light_level_report":{
+                    "light_level_report": {
                         "changed": self.state["lastupdated"],
                         "light_level": self.state["lightlevel"]
                     }
@@ -313,43 +258,33 @@ class Sensor():
                     "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device')),
                     "rtype": "device"
                 },
-                "type": "light_level"}
-        return result
+                "type": "light_level"
+            }
+        return None
 
-    def getZigBee(self):
-        result = None
+    def getZigBee(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "SML001" and self.type != "ZLLPresence":
             return None
         if not self.uniqueid:
             return None
-        result = {}
-        result["id"] = str(uuid.uuid5(
-            uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity'))
-        result["id_v1"] = "/sensors/" + self.id_v1
-        result["owner"] = {
-            "rid": self.id_v2,
-            "rtype": "device"
-            }
-        result["type"] = "zigbee_connectivity"
-        result["mac_address"] = self.uniqueid[:23]
-        result["status"] = "connected"
-        return result
-    
-    def getButtons(self):
-        result = []
-        if self.modelid == "RWL022" or self.modelid == "RWL021" or self.modelid == "RWL020" or self.modelid == "RDM002" and self.type != "ZLLRelativeRotary":
-            for button in range(4):
-                result.append({
-                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'button' + str(button + 1))),
-                "id_v1": "/sensors/" + self.id_v1,
-                "owner": {
-                  "rid": self.id_v2,
-                  "rtype": "device"
-                },
-                "metadata": {
-                  "control_id": button + 1
-                },
-                "button": {
+        return {
+            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zigbee_connectivity')),
+            "id_v1": "/sensors/" + self.id_v1,
+            "owner": {"rid": self.id_v2, "rtype": "device"},
+            "type": "zigbee_connectivity",
+            "mac_address": self.uniqueid[:23],
+            "status": "connected"
+        }
+
+    def getButtons(self) -> Optional[Dict[str, Any]]:
+        if self.modelid in ["RWL022", "RWL021", "RWL020", "RDM002"] and self.type != "ZLLRelativeRotary":
+            return [
+                {
+                    "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + f'button{button + 1}')),
+                    "id_v1": "/sensors/" + self.id_v1,
+                    "owner": {"rid": self.id_v2, "rtype": "device"},
+                    "metadata": {"control_id": button + 1},
+                    "button": {
                         "last_event": "short_release",
                         "button_report": {
                             "updated": self.state["lastupdated"],
@@ -364,80 +299,96 @@ class Sensor():
                             "long_press"
                         ]
                     },
-                "type": "button"
-              })
-        return result
-    
-    def getRotary(self):
-        result = []
+                    "type": "button"
+                } for button in range(4)
+            ]
+        return None
+
+    def getRotary(self) -> Optional[Dict[str, Any]]:
         if self.modelid == "RDM002" and self.type == "ZLLRelativeRotary":
-            result.append({
+            return {
                 "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'relative_rotary')),
                 "id_v1": "/sensors/" + self.id_v1,
-                "owner": {
-                  "rid": self.id_v2,
-                  "rtype": "device"
-                },
-                "rotary_report": {
-                    "updated": self.state["lastupdated"],
-                    "action": "start" if self.state["rotaryevent"] == 1 else "repeat",
-                    "rotation": {
-                        "direction": "right",#self.state["direction"],
-                        "steps": self.state["expectedrotation"],
-                        "duration": self.state["expectedeventduration"]
+                "owner": {"rid": self.id_v2, "rtype": "device"},
+                "relative_rotary": {
+                    "rotary_report": {
+                        "updated": self.state["lastupdated"],
+                        "action": "start" if self.state["rotaryevent"] == 1 else "repeat",
+                        "rotation": {
+                            "direction": "right",
+                            "steps": self.state["expectedrotation"],
+                            "duration": self.state["expectedeventduration"]
+                        }
                     }
                 },
                 "type": "relative_rotary"
-            })
-        return result
+            }
+        return None
 
-    def getDevicePower(self):
-        result = None
+    def getDevicePower(self) -> Optional[Dict[str, Any]]:
         if "battery" in self.config:
-            result = {
-                "id": str(uuid.uuid5(
-                    uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
+            return {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'device_power')),
                 "id_v1": "/sensors/" + self.id_v1,
-                "owner": {
-                    "rid": self.id_v2,
-                    "rtype": "device"
+                "owner": {"rid": self.id_v2, "rtype": "device"},
+                "power_state": {
+                    "battery_level": self.config["battery"],
+                    "battery_state": "normal"
                 },
-                "power_state": {},
                 "type": "device_power"
             }
-            if self.config["battery"]:
-                result["power_state"].update({"battery_level": self.config["battery"],
-                    "battery_state": "normal"
-                    })
-        return result
+        return None
 
-    def update_attr(self, newdata):
+    def getContact(self) -> Optional[Dict[str, Any]]:
+        if self.modelid == "SOC001":
+            return {
+                "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'contact')),
+                "id_v1": "/sensors/" + self.id_v1,
+                "owner": {"rid": self.id_v2, "rtype": "device"},
+                "contact_report": {
+                    "changed": "2023-11-08T20:32:24.507Z",
+                    "state": "contact"
+                },
+                "type": "contact"
+            }
+        return None
+
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
         if self.id_v1 == "1" and "config" in newdata:  # manage daylight sensor
             if "long" in newdata["config"] and "lat" in newdata["config"]:
-                self.config["configured"]=True
-                self.protocol_cfg={"long": float(
-                    newdata["config"]["long"][:-1]), "lat": float(newdata["config"]["lat"][:-1])}
+                self.config["configured"] = True
+                self.protocol_cfg = {
+                    "long": float(newdata["config"]["long"][:-1]),
+                    "lat": float(newdata["config"]["lat"][:-1])
+                }
                 return
         for key, value in newdata.items():
-            updateAttribute=getattr(self, key)
+            updateAttribute = getattr(self, key)
             if isinstance(updateAttribute, dict):
                 updateAttribute.update(value)
                 setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
+        streamMessage = {
+            "creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [self.getButtons()],
+            "id": str(uuid.uuid4()),
+            "type": "update"
+        }
+        StreamEvent(streamMessage)
 
-    def save(self):
-        result={}
-        result["name"]=self.name
-        result["id_v1"]=self.id_v1
-        result["id_v2"]=self.id_v2
-        result["state"]=self.state
-        result["config"]=self.config
-        result["type"]=self.type
-        result["modelid"]=self.modelid
-        result["manufacturername"]=self.manufacturername
-        result["uniqueid"]=self.uniqueid
-        result["swversion"]=self.swversion
-        result["protocol"]=self.protocol
-        result["protocol_cfg"]=self.protocol_cfg
-        return result
+    def save(self) -> Dict[str, Any]:
+        return {
+            "name": self.name,
+            "id_v1": self.id_v1,
+            "id_v2": self.id_v2,
+            "state": self.state,
+            "config": self.config,
+            "type": self.type,
+            "modelid": self.modelid,
+            "manufacturername": self.manufacturername,
+            "uniqueid": self.uniqueid,
+            "swversion": self.swversion,
+            "protocol": self.protocol,
+            "protocol_cfg": self.protocol_cfg
+        }

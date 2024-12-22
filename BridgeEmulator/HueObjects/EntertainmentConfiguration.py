@@ -3,163 +3,101 @@ import logManager
 import weakref
 from datetime import datetime, timezone
 from HueObjects import genV2Uuid, v1StateToV2, v2StateToV1, setGroupAction, StreamEvent
+from typing import Dict, Any, List, Optional, Union
 
 logging = logManager.logger.get_logger(__name__)
 
-class EntertainmentConfiguration():
-    def __init__(self, data):
-        self.name = data["name"] if "name" in data else "Group " + \
-            data["id_v1"]
-        self.id_v1 = data["id_v1"]
-        self.id_v2 = data["id_v2"] if "id_v2" in data else genV2Uuid()
-        self.configuration_type = data["configuration_type"] if "configuration_type" in data else "3dspace"
-        self.lights = []
-        self.action = {"on": False, "bri": 100, "hue": 0, "sat": 254, "effect": "none", "xy": [
-            0.0, 0.0], "ct": 153, "alert": "none", "colormode": "xy"}
-        self.sensors = []
-        self.type = data["type"] if "type" in data else "Entertainment"
-        self.configuration_type = data["configuration_type"] if "configuration_type" in data else "screen"
-        self.locations = weakref.WeakKeyDictionary()
-        self.stream = {"proxymode": "auto",
-                       "proxynode": "/bridge", "active": False, "owner": None}
-        self.state = {"all_on": False, "any_on": False}
-        self.dxState = {"all_on": None, "any_on": None}
+class EntertainmentConfiguration:
+    def __init__(self, data: Dict[str, Any]):
+        self.name: str = data.get("name", f"Group {data['id_v1']}")
+        self.id_v1: str = data["id_v1"]
+        self.id_v2: str = data.get("id_v2", genV2Uuid())
+        self.configuration_type: str = data.get("configuration_type", "screen")
+        self.lights: List[weakref.ref] = []
+        self.action: Dict[str, Union[bool, int, float, str, List[float]]] = {
+            "on": False, "bri": 100, "hue": 0, "sat": 254, "effect": "none", "xy": [0.0, 0.0], "ct": 153, "alert": "none", "colormode": "xy"
+        }
+        self.sensors: List[weakref.ref] = []
+        self.type: str = data.get("type", "Entertainment")
+        self.locations: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+        self.stream: Dict[str, Union[str, bool, None]] = {"proxymode": "auto", "proxynode": "/bridge", "active": False, "owner": None}
+        self.state: Dict[str, bool] = {"all_on": False, "any_on": False}
+        self.dxState: Dict[str, Optional[bool]] = {"all_on": None, "any_on": None}
 
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Api()],
-                         "id": str(uuid.uuid4()),
-                         "type": "add"
-                         }
-        StreamEvent(streamMessage)
+        self._send_stream_event(self.getV2Api(), "add")
 
     def __del__(self):
-        # Groupper light
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.id_v2, "type": "grouped_light"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
-        streamMessage["id_v1"] = "/groups/" + self.id_v1
-        StreamEvent(streamMessage)
-        ### Entertainment area ###
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.getV2Api()["id"], "type": "entertainment_configuration"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
-        streamMessage["id_v1"] = "/groups/" + self.id_v1
-        StreamEvent(streamMessage)
-        logging.info(self.name + " entertainment area was destroyed.")
+        self._send_stream_event({"id": self.id_v2, "type": "grouped_light"}, "delete")
+        self._send_stream_event({"id": self.getV2Api()["id"], "type": "entertainment_configuration"}, "delete")
+        logging.info(f"{self.name} entertainment area was destroyed.")
 
-    def add_light(self, light):
+    def add_light(self, light: Any) -> None:
         self.lights.append(weakref.ref(light))
         self.locations[light] = [{"x": 0, "y": 0, "z": 0}]
 
-    def update_attr(self, newdata):
-        if "lights" in newdata:  # update of the lights must be done using add_light function
-            del newdata["lights"]
-        if "locations" in newdata:  # update of the locations must be done directly from restful
-            del newdata["locations"]
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
+        newdata.pop("lights", None)
+        newdata.pop("locations", None)
         for key, value in newdata.items():
             updateAttribute = getattr(self, key)
             if isinstance(updateAttribute, dict):
                 updateAttribute.update(value)
-                setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
-        streamMessage = {"creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Api()],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
-        StreamEvent(streamMessage)
+        self._send_stream_event(self.getV2Api(), "update")
 
-    def update_state(self):
-        all_on = True
+    def update_state(self) -> Dict[str, bool]:
+        all_on = bool(self.lights)
         any_on = False
-        if len(self.lights) == 0:
-            all_on = False
         for light in self.lights:
-            if light():
-                if light().state["on"]:
-                    any_on = True
-                else:
-                    all_on = False
+            if light() and light().state["on"]:
+                any_on = True
+            else:
+                all_on = False
         return {"all_on": all_on, "any_on": any_on}
 
-    def getV2GroupedLight(self):
-        result = {}
-        result["alert"] = {
-            "action_values": [
-                "breathe"
-            ]
+    def getV2GroupedLight(self) -> Dict[str, Any]:
+        return {
+            "alert": {"action_values": ["breathe"]},
+            "id": self.id_v2,
+            "id_v1": f"/groups/{self.id_v1}",
+            "on": {"on": self.update_state()["any_on"]},
+            "type": "grouped_light"
         }
-        result["id"] = self.id_v2
-        result["id_v1"] = "/groups/" + self.id_v1
-        result["on"] = {"on": self.update_state()["any_on"]}
-        result["type"] = "grouped_light"
-        return result
 
-    def getV1Api(self):
-        result = {}
-        result["name"] = self.name
-        lights = []
-        for light in self.lights:
-            if light():
-                lights.append(light().id_v1)
-        sensors = []
-        for sensor in self.sensors:
-            if sensor():
-                sensors.append(sensor().id_v1)
-        result["lights"] = lights
-        result["sensors"] = sensors
-        result["type"] = self.type
-        result["state"] = self.update_state()
-        result["recycle"] = False
-        class_type = "TV"
-        if self.configuration_type == "3dspace":
-            class_type == "Free"
-        result["class"] = class_type
-        result["action"] = self.action
+    def getV1Api(self) -> Dict[str, Any]:
+        lights = [light().id_v1 for light in self.lights if light()]
+        sensors = [sensor().id_v1 for sensor in self.sensors if sensor()]
+        locations = {light.id_v1: [loc[0]["x"], loc[0]["y"], loc[0]["z"]] for light, loc in list(self.locations.items()) if light.id_v1 in lights}
+        class_type = "Free" if self.configuration_type == "3dspace" else "TV"
+        return {
+            "name": self.name,
+            "lights": lights,
+            "sensors": sensors,
+            "type": self.type,
+            "state": self.update_state(),
+            "recycle": False,
+            "class": class_type,
+            "action": self.action,
+            "locations": locations,
+            "stream": self.stream
+        }
 
-        result["locations"] = {}
-        locations = list(self.locations.items())
-        for light, location in locations:
-            if light.id_v1 in lights:
-                result["locations"][light.id_v1] = [
-                    location[0]["x"], location[0]["y"], location[0]["z"]]
-        result["stream"] = self.stream
-        return result
-
-    def getV2Api(self):
-
-        gradienStripPositions = [{"x": -0.4000000059604645, "y": 0.800000011920929, "z": -0.4000000059604645},
-                                 {"x": -0.4000000059604645,
-                                     "y": 0.800000011920929, "z": 0.0},
-                                 {"x": -0.4000000059604645, "y": 0.800000011920929,
-                                     "z": 0.4000000059604645},
-                                 {"x": 0.0, "y": 0.800000011920929,
-                                     "z": 0.4000000059604645},
-                                 {"x": 0.4000000059604645, "y": 0.800000011920929,
-                                     "z": 0.4000000059604645},
-                                 {"x": 0.4000000059604645,
-                                     "y": 0.800000011920929, "z": 0.0},
-                                 {"x": 0.4000000059604645, "y": 0.800000011920929, "z": -0.4000000059604645}]
-
+    def getV2Api(self) -> Dict[str, Any]:
+        gradienStripPositions = [
+            {"x": -0.4, "y": 0.8, "z": -0.4}, {"x": -0.4, "y": 0.8, "z": 0.0}, {"x": -0.4, "y": 0.8, "z": 0.4},
+            {"x": 0.0, "y": 0.8, "z": 0.4}, {"x": 0.4, "y": 0.8, "z": 0.4}, {"x": 0.4, "y": 0.8, "z": 0.0},
+            {"x": 0.4, "y": 0.8, "z": -0.4}
+        ]
         result = {
             "configuration_type": self.configuration_type,
-            "locations": {
-                "service_locations": []
-            },
-            "metadata": {
-                "name": self.name
-            },
-            "id_v1": "/groups/" + self.id_v1,
+            "locations": {"service_locations": []},
+            "metadata": {"name": self.name},
+            "id_v1": f"/groups/{self.id_v1}",
             "stream_proxy": {
                 "mode": "auto",
                 "node": {
-                    "rid": str(uuid.uuid5(
-                        uuid.NAMESPACE_URL, self.lights[0]().id_v2 + 'entertainment')) if len(self.lights) > 0 else None,
+                    "rid": str(uuid.uuid5(uuid.NAMESPACE_URL, self.lights[0]().id_v2 + 'entertainment')) if self.lights else None,
                     "rtype": "entertainment"
                 }
             },
@@ -175,87 +113,75 @@ class EntertainmentConfiguration():
         channel_id = 0
         for light in self.lights:
             if light():
-                result["light_services"].append(
-                    {"rtype": "light", "rid": light().id_v2})
-                entertainmentUuid = str(uuid.uuid5(
-                    uuid.NAMESPACE_URL, light().id_v2 + 'entertainment'))
-                result["locations"]["service_locations"].append({"equalization_factor": 1, "positions": self.locations[light()],
-                                                                 "service": {"rid": entertainmentUuid, "rtype": "entertainment"}, "position": self.locations[light()][0]})
-
-                loops = 1
-                gradientStrip = False
-                if light().modelid in ["LCX001", "LCX002", "LCX003"]:
-                    loops = len(gradienStripPositions)
-                elif light().modelid in ["915005987201", "LCX004", "LCX006"]:
-                    loops = len(self.locations[light()])
+                result["light_services"].append({"rtype": "light", "rid": light().id_v2})
+                entertainmentUuid = str(uuid.uuid5(uuid.NAMESPACE_URL, light().id_v2 + 'entertainment'))
+                result["locations"]["service_locations"].append({
+                    "equalization_factor": 1,
+                    "positions": self.locations[light()],
+                    "service": {"rid": entertainmentUuid, "rtype": "entertainment"},
+                    "position": self.locations[light()][0]
+                })
+                loops = len(gradienStripPositions) if light().modelid in ["LCX001", "LCX002", "LCX003"] else len(self.locations[light()])
                 for x in range(loops):
-                    print("x:", x)
                     channel = {
                         "channel_id": channel_id,
-                        "members": [
-                            {
-                                "index": x,
-                                "service": {
-                                    "rid": entertainmentUuid,
-                                    "rtype": "entertainment"
-                                }
-                            }
-                        ]
+                        "members": [{"index": x, "service": {"rid": entertainmentUuid, "rtype": "entertainment"}}]
                     }
                     if light().modelid in ["LCX001", "LCX002", "LCX003"]:
-                        channel["position"] = {"x": gradienStripPositions[x]["x"],
-                                               "y": gradienStripPositions[x]["y"], "z": gradienStripPositions[x]["z"]}
+                        channel["position"] = gradienStripPositions[x]
                     elif light().modelid in ["915005987201", "LCX004", "LCX006"]:
                         if x == 0:
-                            channel["position"] = {"x": self.locations[light(
-                            )][0]["x"], "y": self.locations[light()][0]["y"], "z": self.locations[light()][0]["z"]}
+                            channel["position"] = self.locations[light()][0]
                         elif x == 2:
-                            channel["position"] = {"x": self.locations[light(
-                            )][1]["x"], "y": self.locations[light()][1]["y"], "z": self.locations[light()][1]["z"]}
+                            channel["position"] = self.locations[light()][1]
                         else:
-                            channel["position"] = {"x": (self.locations[light()][0]["x"] + self.locations[light()][1]["x"]) / 2, "y": (self.locations[light(
-                            )][0]["y"] + self.locations[light()][1]["y"]) / 2, "z": (self.locations[light()][0]["z"] + self.locations[light()][1]["z"]) / 2}
+                            channel["position"] = {
+                                "x": (self.locations[light()][0]["x"] + self.locations[light()][1]["x"]) / 2,
+                                "y": (self.locations[light()][0]["y"] + self.locations[light()][1]["y"]) / 2,
+                                "z": (self.locations[light()][0]["z"] + self.locations[light()][1]["z"]) / 2
+                            }
                     else:
-                        channel["position"] = {"x": self.locations[light(
-                        )][0]["x"], "y": self.locations[light()][0]["y"], "z": self.locations[light()][0]["z"]}
-
+                        channel["position"] = self.locations[light()][0]
                     result["channels"].append(channel)
                     channel_id += 1
-
         return result
 
-    def setV2Action(self, state):
+    def setV2Action(self, state: Dict[str, Any]) -> None:
         v1State = v2StateToV1(state)
         setGroupAction(self, v1State)
         self.genStreamEvent(state)
 
-    def setV1Action(self, state, scene=None):
+    def setV1Action(self, state: Dict[str, Any], scene: Optional[str] = None) -> None:
         setGroupAction(self, state, scene)
         v2State = v1StateToV2(state)
         self.genStreamEvent(v2State)
 
-    def genStreamEvent(self, v2State):
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.id_v2, "type": "grouped_light"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
-        streamMessage["id_v1"] = "/groups/" + self.id_v1
-        streamMessage.update(v2State)
+    def genStreamEvent(self, v2State: Dict[str, Any]) -> None:
+        streamMessage = {"data": [{"id": self.id_v2, "type": "grouped_light"}]}
+        streamMessage["data"][0].update(v2State)
+        self._send_stream_event(streamMessage["data"][0], "update")
+
+    def _send_stream_event(self, data: Dict[str, Any], event_type: str) -> None:
+        streamMessage = {
+            "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [data],
+            "id": str(uuid.uuid4()),
+            "type": event_type,
+            "id_v1": f"/groups/{self.id_v1}"
+        }
         StreamEvent(streamMessage)
 
-    def getObjectPath(self):
+    def getObjectPath(self) -> Dict[str, str]:
         return {"resource": "groups", "id": self.id_v1}
 
-    def save(self):
-        result = {"id_v2": self.id_v2, "name": self.name, "configuration_type": self.configuration_type,
-                  "lights": [], "action": self.action, "type": self.type, "configuration_type": self.configuration_type}
-        for light in self.lights:
-            if light():
-                result["lights"].append(light().id_v1)
-        result["locations"] = {}
-        locations = list(self.locations.items())
-        for light, location in locations:
-            if light.id_v1 in result["lights"]:
-                result["locations"][light.id_v1] = location
+    def save(self) -> Dict[str, Any]:
+        result = {
+            "id_v2": self.id_v2,
+            "name": self.name,
+            "configuration_type": self.configuration_type,
+            "lights": [light().id_v1 for light in self.lights if light()],
+            "action": self.action,
+            "type": self.type,
+            "locations": {light.id_v1: loc for light, loc in self.locations.items() if light.id_v1 in [light().id_v1 for light in self.lights if light()]}
+        }
         return result

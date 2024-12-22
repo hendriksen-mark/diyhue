@@ -45,7 +45,8 @@ RUN curl -sL https://github.com/diyhue/diyHueUI/releases/latest/download/DiyHueU
     && rm -r diyhueUI
 
 ## Copy correct (compiled) C file from previous image
-COPY ./BridgeEmulator/genCert.sh ./BridgeEmulator/openssl.conf /opt/hue-emulator/
+COPY ./BridgeEmulator/genCert.sh /opt/hue-emulator/
+COPY ./BridgeEmulator/openssl.conf /opt/hue-emulator/
 
 ## Change Docker script permissions
 RUN chmod +x /opt/hue-emulator/genCert.sh

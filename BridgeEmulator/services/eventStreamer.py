@@ -19,14 +19,19 @@ def messageBroker():
 @stream.route('/eventstream/clip/v2')
 def streamV2Events():
     def generate():
-        counter = 1000
         yield f": hi\n\n"
-        while counter > 0:  # ensure we stop at some point
-            if len(HueObjects.eventstream) > 0:
-                for index, messages in enumerate(HueObjects.eventstream):
-                    yield f"id: {int(time()) }:{index}\ndata: {json.dumps([messages], separators=(',', ':'))}\n\n"
+        while True:
+            try:
+                if len(HueObjects.eventstream) > 0:
+                    for index, messages in enumerate(HueObjects.eventstream):
+                        yield f"id: {int(time()) }:{index}\ndata: {json.dumps([messages], separators=(',', ':'))}\n\n"
+                    HueObjects.eventstream = []
                 sleep(0.2)
-            sleep(0.2)
-            counter -= 1
+            except GeneratorExit:
+                logging.info("Client closed the connection.")
+                break
+            except Exception as e:
+                logging.error(f"Error in event stream: {e}")
+                break
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream; charset=utf-8')

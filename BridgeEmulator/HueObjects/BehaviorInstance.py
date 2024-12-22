@@ -2,64 +2,74 @@ import uuid
 import logManager
 from HueObjects import genV2Uuid, StreamEvent
 from datetime import datetime, timezone
+from typing import Dict, Any, Optional, List
 
 logging = logManager.logger.get_logger(__name__)
 
-class BehaviorInstance():
-    def __init__(self, data):
-        self.id_v2 = data["id"] if "id" in data else genV2Uuid()
-        self.id_v1 = self.id_v2  # used for config save
-        self.name = data["metadata"]["name"] if "name" in data["metadata"] else None
-        self.configuration = data["configuration"]
-        self.enabled = data["enabled"] if "enabled" in data else False
-        self.active = data["active"] if "active" in data else False
-        self.script_id = data["script_id"] if "script_id" in data else ""
+class BehaviorInstance:
+    def __init__(self, data: Dict[str, Any]) -> None:
+        self.id_v2: str = data.get("id", genV2Uuid())
+        self.id_v1: str = self.id_v2  # used for config save
+        self.name: Optional[str] = data["metadata"].get("name")
+        self.meta_type: Optional[str] = data["metadata"].get("type")
+        self.configuration: Dict[str, Any] = data["configuration"]
+        self.enabled: bool = data.get("enabled", False)
+        self.active: bool = data.get("active", False)
+        self.script_id: str = data.get("script_id", "")
 
-        streamMessage = {"creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Api()],
-                         "id": str(uuid.uuid4()),
-                         "type": "add"
-                         }
+        streamMessage = {
+            "creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [self.getV2Api()],
+            "id": str(uuid.uuid4()),
+            "type": "add"
+        }
         StreamEvent(streamMessage)
 
-    def __del__(self):
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.id_v2, "type": "behavior_instance"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
+    def __del__(self) -> None:
+        streamMessage = {
+            "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [{"id": self.id_v2, "type": "behavior_instance"}],
+            "id": str(uuid.uuid4()),
+            "type": "delete"
+        }
         StreamEvent(streamMessage)
-        logging.info(self.name + " behaviour instance was destroyed.")
+        logging.info(f"{self.name} behaviour instance was destroyed.")
 
-    def getV2Api(self):
-        result = {"configuration": self.configuration,
-                  "dependees": [],
-                  "enabled": self.enabled,
-                  "id": self.id_v2,
-                  "last_error": "",
-                  "metadata": {
-                      "name": "noname"
-                  },
-                  "script_id": self.script_id,
-                  "status": "running" if self.enabled else "disabled",
-                  "type": "behavior_instance"
-                  }
+    def activate(self, data: Dict[str, Any]) -> None:
+        if "recall" in data and data["recall"].get("action") == "deactive":
+            self.active = False
 
-        if self.name != None:
-            result["metadata"]["name"] = self.name
+    def getV2Api(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "configuration": self.configuration,
+            "dependees": [],
+            "enabled": self.enabled,
+            "id": self.id_v2,
+            "last_error": "",
+            "metadata": {
+                "name": self.name or "noname",
+                "type": self.meta_type or "notype"
+            },
+            "script_id": self.script_id,
+            "status": "running" if self.enabled else "disabled",
+            "type": "behavior_instance"
+        }
 
-        for resource in self.configuration["where"]:
-            result["dependees"].append({"level": "critical",
-                                        "target": {
-                                            "rid": resource[list(resource.keys())[0]]["rid"],
-                                            "rtype": resource[list(resource.keys())[0]]["rtype"]
-                                        },
-                                        "type": "ResourceDependee"
-                                        })
+        if "where" in self.configuration:
+            for resource in self.configuration["where"]:
+                resource_key = list(resource.keys())[0]
+                result["dependees"].append({
+                    "level": "critical",
+                    "target": {
+                        "rid": resource[resource_key]["rid"],
+                        "rtype": resource[resource_key]["rtype"]
+                    },
+                    "type": "ResourceDependee"
+                })
 
         return result
 
-    def update_attr(self, newdata):
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
         for key, value in newdata.items():
             if key == "metadata" and "name" in value:
                 self.name = value["name"]
@@ -70,17 +80,21 @@ class BehaviorInstance():
                 setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
-        streamMessage = {"creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Api()],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
+        streamMessage = {
+            "creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [self.getV2Api()],
+            "id": str(uuid.uuid4()),
+            "type": "update"
+        }
         StreamEvent(streamMessage)
 
-    def save(self):
-        result = {"id": self.id_v2, "metadata": {"name": self.name}, "configuration": self.configuration, "enabled": self.enabled, "active": self.active,
-                  "script_id": self.script_id}
-        if self.name != None:
-            result["metadata"] = {"name": self.name}
-
+    def save(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {
+            "id": self.id_v2,
+            "metadata": {"name": self.name},
+            "configuration": self.configuration,
+            "enabled": self.enabled,
+            "active": self.active,
+            "script_id": self.script_id
+        }
         return result

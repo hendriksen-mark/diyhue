@@ -8,13 +8,23 @@ from datetime import datetime, timezone
 from threading import Thread
 from time import sleep
 from functions.behavior_instance import checkBehaviorInstances
+from typing import Dict, Any, Union
 
 logging = logManager.logger.get_logger(__name__)
 
 bridgeConfig = configManager.bridgeConfig.yaml_config
 
 
-def noMotion(sensor):
+def noMotion(sensor: str) -> None:
+    """
+    Monitor the sensor for no motion and update its state after 60 seconds of inactivity.
+
+    Args:
+        sensor (str): The sensor identifier.
+
+    Returns:
+        None
+    """
     bridgeConfig["sensors"][sensor].protocol_cfg["threaded"] = True
     logging.info("Monitor the sensor for no motion")
 
@@ -28,96 +38,216 @@ def noMotion(sensor):
 
 
 class Switch(Resource):
-    def get(self):
+    def get(self) -> Dict[str, Union[str, Dict[str, str]]]:
+        """
+        Handle GET requests to register or update devices based on the provided arguments.
+
+        Args:
+            None
+
+        Returns:
+            Dict[str, Union[str, Dict[str, str]]]: The result of the operation.
+        """
         args = request.args
-        if "mac" in args:
-            current_time = datetime.now()
-            mac = args["mac"]
-            if "devicetype" in args:  # device registration if is new
-                deviceIsNew = True
-                for device, obj in bridgeConfig["sensors"].items():
-                    if "mac" in obj.protocol_cfg and obj.protocol_cfg["mac"] == mac:
-                        deviceIsNew = False
-                        break
-                if deviceIsNew:
-                    if args["devicetype"] in ["ZLLSwitch", "ZGPSwitch"]:
-                        sensor = addHueSwitch("", args["devicetype"])
-                        sensor.protocol_cfg["mac"] = mac
-                        return {"success": "device registered"}
-                    elif args["devicetype"] == "ZLLPresence":
-                        sensor = addHueMotionSensor("Hue Motion Sensor", "native", {
-                                                    "mac": mac, "threaded": False})
-                        return {"success": "device registered"}
-                    elif args["devicetype"] == "ZLLRelativeRotary":
-                        sensor = addHueRotarySwitch({"mac": mac})
-                        return {"success": "device registered"}
-                    else:
-                        return {"fail": "unknown device"}
-                else:
-                    return {"fail": "device already registerd"}
-            else:
-                result = {""}
-                for device, obj in bridgeConfig["sensors"].items():
-                    if "mac" in obj.protocol_cfg:
-                        if obj.protocol_cfg["mac"] == mac:
-                            if obj.type == "ZLLLightLevel":
-                                if "lightlevel" in args:
-                                    obj.state["lightlevel"] = int(args["lightlevel"])
-                                    obj.dxState["lightlevel"] = current_time
-                                if "dark" in args:
-                                    dark = True if args["dark"] == "true" else False
-                                    if obj.state["dark"] != dark:
-                                        obj.dxState["dark"] = current_time
-                                        obj.state["dark"] = dark
-                                if "daylight" in args:
-                                    daylight = True if args["daylight"] == "true" else False
-                                    if obj.state["daylight"] != daylight:
-                                        obj.dxState["daylight"] = current_time
-                                        obj.state["daylight"] = daylight
-                            elif obj.type == "ZLLPresence":
-                                if "battery" in args:
-                                    obj.config["battery"] = int(args["battery"])
-                                if "presence" in args:
-                                    presence = True if args["presence"] == "true" else False
-                                    if obj.state["presence"] != presence:
-                                        obj.state["presence"] = presence
-                                        obj.dxState["presence"] = current_time
-                                        if obj.protocol_cfg["threaded"] == False:
-                                            Thread(target=noMotion, args=[device]).start()
-                            elif obj.type == "ZLLTemperature":
-                                if "temperature" in args:
-                                    obj.state["temperature"] = int(args["temperature"])
-                                    obj.dxState["temperature"] = current_time
-                            elif obj.type in ["ZLLSwitch", "ZGPSwitch"]:
-                                if "button" in args:
-                                    obj.update_attr({"state":{"buttonevent":int(args["button"])}})
-                                    #obj.state["buttonevent"] = int(args["button"])
-                                    obj.dxState["buttonevent"] = current_time
-                                if "battery" in args:
-                                    obj.update_attr({"config":{"battery":int(args["battery"])}})
-                                    #obj.config["battery"] = int(args["battery"])
-                            elif obj.type == "ZLLRelativeRotary":
-                                if "rotary" in args:
-                                    obj.state["rotaryevent"] = int(args["rotary"])
-                                    obj.state["expectedrotation"] = int(args["rotation"])
-                                    obj.state["expectedeventduration"] = int(args["duration"])
-                                    obj.dxState["rotaryevent"] = current_time
-                                if "battery" in args:
-                                    obj.config["battery"] = int(args["battery"])
-                            else:
-                                result = {"fail": "unknown device"}
-                            obj.dxState["lastupdated"] = current_time
-                            obj.state["lastupdated"] = datetime.now(timezone.utc).strftime(
-                                "%Y-%m-%dT%H:%M:%S.000Z")
-                            rulesProcessor(obj, current_time)
-                            checkBehaviorInstances(obj)
-                            result = {"success": "command applied"}
-                        else:
-                            if result == {""} or result == {"fail": "no mac in list"}:
-                                result = {"fail": "device not found"}
-                    else:
-                        if result == {""}:
-                            result = {"fail": "no mac in list"}
-                return result
-        else:
+        if "mac" not in args:
             return {"fail": "missing mac address"}
+
+        current_time = datetime.now()
+        mac = args["mac"]
+
+        if "devicetype" in args:  # device registration if is new
+            if self.is_device_new(mac):
+                return self.register_device(args, mac)
+            else:
+                return {"fail": "device already registered"}
+        else:
+            return self.update_device(args, mac, current_time)
+
+    def is_device_new(self, mac: str) -> bool:
+        """
+        Check if the device with the given MAC address is new.
+
+        Args:
+            mac (str): The MAC address of the device.
+
+        Returns:
+            bool: True if the device is new, False otherwise.
+        """
+        return all(
+            obj.protocol_cfg.get("mac") != mac for obj in bridgeConfig["sensors"].values()
+        )
+
+    def register_device(self, args: Dict[str, str], mac: str) -> Dict[str, str]:
+        """
+        Register a new device based on the provided arguments and MAC address.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            mac (str): The MAC address of the device.
+
+        Returns:
+            Dict[str, str]: The result of the registration operation.
+        """
+        device_type = args["devicetype"]
+        if device_type in ["ZLLSwitch", "ZGPSwitch"]:
+            sensor = addHueSwitch("", device_type)
+        elif device_type == "ZLLPresence":
+            sensor = addHueMotionSensor("Hue Motion Sensor", "native", {"mac": mac, "threaded": False})
+        elif device_type == "ZLLRelativeRotary":
+            sensor = addHueRotarySwitch({"mac": mac})
+        else:
+            return {"fail": "unknown device"}
+
+        sensor.protocol_cfg["mac"] = mac
+        return {"success": "device registered"}
+
+    def update_device(self, args: Dict[str, str], mac: str, current_time: datetime) -> Dict[str, str]:
+        """
+        Update an existing device based on the provided arguments and MAC address.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            mac (str): The MAC address of the device.
+            current_time (datetime): The current time.
+
+        Returns:
+            Dict[str, str]: The result of the update operation.
+        """
+        for device, obj in bridgeConfig["sensors"].items():
+            if obj.protocol_cfg.get("mac") == mac:
+                self.apply_device_updates(args, obj, current_time)
+                return {"success": "command applied"}
+        return {"fail": "device not found"}
+
+    def apply_device_updates(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Apply updates to the device based on its type and the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        update_methods = {
+            "ZLLLightLevel": self.update_light_level,
+            "ZLLPresence": self.update_presence,
+            "ZLLTemperature": self.update_temperature,
+            "ZLLSwitch": self.update_switch,
+            "ZGPSwitch": self.update_switch,
+            "ZLLRelativeRotary": self.update_rotary,
+        }
+
+        update_method = update_methods.get(obj.type)
+        if update_method:
+            update_method(args, obj, current_time)
+            obj.dxState["lastupdated"] = current_time
+            obj.state["lastupdated"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+            rulesProcessor(obj, current_time)
+            checkBehaviorInstances(obj)
+        else:
+            return {"fail": "unknown device"}
+
+    def update_light_level(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Update the light level sensor based on the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        if "lightlevel" in args:
+            obj.state["lightlevel"] = int(args["lightlevel"])
+            obj.dxState["lightlevel"] = current_time
+        if "dark" in args:
+            dark = args["dark"].lower() == "true"
+            if obj.state["dark"] != dark:
+                obj.dxState["dark"] = current_time
+                obj.state["dark"] = dark
+        if "daylight" in args:
+            daylight = args["daylight"].lower() == "true"
+            if obj.state["daylight"] != daylight:
+                obj.dxState["daylight"] = current_time
+                obj.state["daylight"] = daylight
+
+    def update_presence(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Update the presence sensor based on the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        if "battery" in args:
+            obj.config["battery"] = int(args["battery"])
+        if "presence" in args:
+            presence = args["presence"].lower() == "true"
+            if obj.state["presence"] != presence:
+                obj.state["presence"] = presence
+                obj.dxState["presence"] = current_time
+                if not obj.protocol_cfg["threaded"]:
+                    Thread(target=noMotion, args=[obj]).start()
+
+    def update_temperature(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Update the temperature sensor based on the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        if "temperature" in args:
+            obj.state["temperature"] = int(args["temperature"])
+            obj.dxState["temperature"] = current_time
+
+    def update_switch(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Update the switch sensor based on the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        if "button" in args:
+            obj.update_attr({"state": {"buttonevent": int(args["button"])}})
+            obj.dxState["buttonevent"] = current_time
+        if "battery" in args:
+            obj.update_attr({"config": {"battery": int(args["battery"])}})
+
+    def update_rotary(self, args: Dict[str, str], obj: Any, current_time: datetime) -> None:
+        """
+        Update the rotary sensor based on the provided arguments.
+
+        Args:
+            args (Dict[str, str]): The arguments provided in the request.
+            obj (Any): The device object.
+            current_time (datetime): The current time.
+
+        Returns:
+            None
+        """
+        if "rotary" in args:
+            obj.state["rotaryevent"] = int(args["rotary"])
+            obj.state["expectedrotation"] = int(args["rotation"])
+            obj.state["expectedeventduration"] = int(args["duration"])
+            obj.dxState["rotaryevent"] = current_time
+        if "battery" in args:
+            obj.config["battery"] = int(args["battery"])

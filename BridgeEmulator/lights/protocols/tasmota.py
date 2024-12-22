@@ -11,6 +11,12 @@ def sendRequest(url, timeout=3):
     response = requests.get(url, timeout=timeout, headers=head)
     return response.text
 
+def is_json(content):
+    try:
+        json.loads(content)
+    except ValueError:
+        return False
+    return True
 
 def discover(detectedLights, device_ips):
     logging.debug("tasmota: <discover> invoked!")
@@ -18,7 +24,8 @@ def discover(detectedLights, device_ips):
         try:
             logging.debug ( "tasmota: probing ip " + ip)
             response = requests.get ("http://" + ip + "/cm?cmnd=Status%200", timeout=3)
-            if response.status_code == 200:
+            response.raise_for_status()
+            if response.content and is_json(response.content):  # Check if response content is valid JSON
                 device_data = response.json()
                 #logging.debug(pretty_json(device_data))
                 if ("StatusSTS" in device_data):
@@ -30,8 +37,8 @@ def discover(detectedLights, device_ips):
                     properties = {"rgb": True, "ct": False, "ip": ip, "name": device_data["StatusNET"]["Hostname"], "id": device_data["StatusNET"]["Mac"], "mac": device_data["StatusNET"]["Mac"]}
                     detectedLights.append({"protocol": "tasmota", "name": device_data["StatusNET"]["Hostname"], "modelid": "LCT015", "protocol_cfg": {"ip": ip, "id": device_data["StatusNET"]["Mac"]}})
 
-        except Exception as e:
-            logging.debug("tasmota: ip " + ip + " is unknow device, " + str(e))
+        except requests.RequestException as e:
+            logging.info(f"ip {ip} is unknown device: {e}")
 
 
 def set_light(light, data, rgb = None):

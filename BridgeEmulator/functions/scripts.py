@@ -2,152 +2,203 @@ import logManager
 import configManager
 from time import sleep
 from random import randrange
+from typing import Union, Dict, Any, List, Callable
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config
 
-def findScene(element):
+def findScene(element: Dict[str, Any]) -> Union[Dict[str, Any], bool]:
+    """
+    Find a scene based on the provided element.
+
+    Args:
+        element (Dict[str, Any]): The element to find the scene for.
+
+    Returns:
+        Union[Dict[str, Any], bool]: The found scene or False if not found.
+    """
     for scene, obj in bridgeConfig["scenes"].items():
-        if element["group"]["rtype"] == "room":
-            if obj.id_v2 == element["recall"]["rid"] and obj.group().getV2Room()["id"] == element["group"]["rid"]:
-                return obj
-        elif element["group"]["rtype"] == "zone":
-            if obj.id_v2 == element["recall"]["rid"] and obj.group().getV2Zone()["id"] == element["group"]["rid"]:
-                return obj
+        if element["group"]["rtype"] == "room" and obj.id_v2 == element["recall"]["rid"] and obj.group().getV2Room()["id"] == element["group"]["rid"]:
+            return obj
+        elif element["group"]["rtype"] == "zone" and obj.id_v2 == element["recall"]["rid"] and obj.group().getV2Zone()["id"] == element["group"]["rid"]:
+            return obj
     return False
 
-def findGroup(id_v2):
+def findGroup(id_v2: str) -> Union[Dict[str, Any], bool]:
+    """
+    Find a group based on the provided id_v2.
+
+    Args:
+        id_v2 (str): The id_v2 to find the group for.
+
+    Returns:
+        Union[Dict[str, Any], bool]: The found group or False if not found.
+    """
     for group, obj in bridgeConfig["groups"].items():
-        if obj.type != "Entertainment":
-            if obj.getV2Room()["id"] == id_v2:
-                return obj
-            elif obj.getV2Zone()["id"] == id_v2:
-                return obj
+        if obj.type != "Entertainment" and (obj.getV2Room()["id"] == id_v2 or obj.getV2Zone()["id"] == id_v2):
+            return obj
     return False
 
-def triggerScript(behavior_instance):
+def handleWakeUp(behavior_instance: Dict[str, Any]) -> None:
+    """
+    Handle the Wake Up routine.
 
-    if "when_extended" in behavior_instance.configuration and "randomization" in behavior_instance.configuration["when_extended"]:
-        sleep(randrange(behavior_instance.configuration["when_extended"]["randomization"]["minutes"] * 60))
-
-    # Wake Up
-    if behavior_instance.script_id == "ff8957e3-2eb9-4699-a0c8-ad2cb3ede704":
-        if behavior_instance.active and "turn_lights_off_after" in behavior_instance.configuration:
-            logging.debug("End Wake Up routine")
-            for element in behavior_instance.configuration["where"]:
-                if "group" in element:
-                    group = findGroup(element["group"]["rid"])
-                    sleep(1)
-                    group.setV1Action(state={"on": False})
-                    behavior_instance.active = False
-                    logging.debug("End Wake Up")
-
-        else:
-            logging.debug("Start Wake Up routine")
-            for element in behavior_instance.configuration["where"]:
-                if "group" in element:
-                    group = findGroup(element["group"]["rid"])
-                    group.setV1Action(state={"ct": 250, "bri": 1})
-                    sleep(1)
-                    group.setV1Action(state={"on": True})
-                    group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["fade_in_duration"]["seconds"] * 10})
-                    behavior_instance.active = True if "turn_lights_off_after" in behavior_instance.configuration else False
-                    logging.debug("Finish Wake Up")
-
-    # Go to sleep
-    elif behavior_instance.script_id == "7e571ac6-f363-42e1-809a-4cbf6523ed72":
-        logging.debug("Start Go to Sleep " + behavior_instance.name)
+    Args:
+        behavior_instance (Dict[str, Any]): The behavior instance to handle.
+    """
+    if behavior_instance.active and "turn_lights_off_after" in behavior_instance.configuration:
+        logging.debug("End Wake Up routine")
         for element in behavior_instance.configuration["where"]:
             if "group" in element:
                 group = findGroup(element["group"]["rid"])
-                group.setV1Action(state={"ct": 500})
                 sleep(1)
-                group.setV1Action(state={"bri": 1, "transitiontime": behavior_instance.configuration["fade_out_duration"]["seconds"] * 10})
-                sleep(behavior_instance.configuration["fade_out_duration"]["seconds"])
-                if behavior_instance.configuration["end_state"] ==  "turn_off":
-                    group.setV1Action(state={"on": False})
+                group.setV1Action(state={"on": False})
                 behavior_instance.active = False
-                logging.debug("Finish Go to Sleep")
+                logging.debug("End Wake Up")
+    else:
+        logging.debug("Start Wake Up routine")
+        for element in behavior_instance.configuration["where"]:
+            if "group" in element:
+                group = findGroup(element["group"]["rid"])
+                group.setV1Action(state={"ct": 250, "bri": 1})
+                sleep(1)
+                group.setV1Action(state={"on": True})
+                group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["fade_in_duration"]["seconds"] * 10})
+                behavior_instance.active = "turn_lights_off_after" in behavior_instance.configuration
+                logging.debug("Finish Wake Up")
 
-    # Activate scene
-    elif behavior_instance.script_id == "7238c707-8693-4f19-9095-ccdc1444d228":
-        if behavior_instance.active and "end_at" in behavior_instance.configuration["when_extended"]:
-            logging.debug("End routine " + behavior_instance.name)
-            for element in behavior_instance.configuration["what"]:
-              if "group" in element:
-                  scene = findScene(element)
-                  if scene:
-                      logging.info("Deactivate scene " + scene.name)
-                      putDict = {"recall": {"action": "deactivate"}}
-                      scene.activate(putDict)
-                  group = findGroup(element["group"]["rid"])
-                  logging.info("Turn off group " + group.name)
-                  group.setV1Action({"on": False})
-                  behavior_instance.active = False
-        else:
-            logging.debug("Start routine " + behavior_instance.name)
-            for element in behavior_instance.configuration["what"]:
-              if "group" in element:
-                  scene = findScene(element)
-                  if scene:
-                      logging.info("Activate scene " + scene.name)
-                      if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
-                          putDict = {"recall": {"action": "active"}, "minutes": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"]}
-                          scene.activate(putDict)
-                  else:
-                      group = findGroup(element["group"]["rid"])
-                      if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b": # Bright scene
-                          logging.info("Apply Bright scene to group " + group.name)
-                          group.setV1Action(state={"ct": 247, "bri": 1})
-                          sleep(1)
-                          group.setV1Action(state={"on": True})
-                          group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"] * 60 * 10})
-                          #group.setV1Action({"on": True, "bri": 254, "ct": 247})
-                  behavior_instance.active = True if "end_at" in behavior_instance.configuration["when_extended"] else False
+def handleGoToSleep(behavior_instance: Dict[str, Any]) -> None:
+    """
+    Handle the Go to Sleep routine.
 
-    # Countdown Timer
-    elif behavior_instance.script_id == "e73bc72d-96b1-46f8-aa57-729861f80c78":
-        logging.debug("Start Countdown Timer " + behavior_instance.name)
-        secondsToCount = 0
-        if "duration" in behavior_instance.configuration:
-          if "minutes" in behavior_instance.configuration["duration"]:
-              secondsToCount = behavior_instance.configuration["duration"]["minutes"] * 60
-          if "seconds" in behavior_instance.configuration["duration"]:
-              secondsToCount += behavior_instance.configuration["duration"]["seconds"]
-        sleep(secondsToCount)
+    Args:
+        behavior_instance (Dict[str, Any]): The behavior instance to handle.
+    """
+    logging.debug("Start Go to Sleep " + behavior_instance.name)
+    for element in behavior_instance.configuration["where"]:
+        if "group" in element:
+            group = findGroup(element["group"]["rid"])
+            group.setV1Action(state={"ct": 500})
+            sleep(1)
+            group.setV1Action(state={"bri": 1, "transitiontime": behavior_instance.configuration["fade_out_duration"]["seconds"] * 10})
+            sleep(behavior_instance.configuration["fade_out_duration"]["seconds"])
+            if behavior_instance.configuration["end_state"] == "turn_off":
+                group.setV1Action(state={"on": False})
+            behavior_instance.active = False
+            logging.debug("Finish Go to Sleep")
+
+def handleActivateScene(behavior_instance: Dict[str, Any]) -> None:
+    """
+    Handle the Activate Scene routine.
+
+    Args:
+        behavior_instance (Dict[str, Any]): The behavior instance to handle.
+    """
+    if behavior_instance.active and "end_at" in behavior_instance.configuration["when_extended"]:
+        logging.debug("End routine " + behavior_instance.name)
         for element in behavior_instance.configuration["what"]:
             if "group" in element:
                 scene = findScene(element)
-                group = findGroup(element["group"]["rid"])
                 if scene:
-                    logging.info("Activate scene " + scene.name + " to group " + group.name)
-                    putDict = {"recall": {"action": "active"}}
+                    logging.info("Deactivate scene " + scene.name)
+                    putDict = {"recall": {"action": "deactivate"}}
                     scene.activate(putDict)
+                group = findGroup(element["group"]["rid"])
+                logging.info("Turn off group " + group.name)
+                group.setV1Action({"on": False})
+                behavior_instance.active = False
+    else:
+        logging.debug("Start routine " + behavior_instance.name)
+        for element in behavior_instance.configuration["what"]:
+            if "group" in element:
+                scene = findScene(element)
+                if scene:
+                    logging.info("Activate scene " + scene.name)
+                    if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
+                        putDict = {"recall": {"action": "active"}, "minutes": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"]}
+                        scene.activate(putDict)
                 else:
-                  if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b": # Bright scene
-                      logging.info("Apply Bright scene to group " + group.name)
-                      group.setV1Action(state={"on": True, "bri": 254, "ct": 247})
-                  else:
-                      logging.info("Apply Bright scene to group " + group.name)
-                      group.setV1Action(state={"on": True, "bri": 254, "ct": 370})
-        behavior_instance.active = False
-        behavior_instance.update_attr({"enabled":False})
-        logging.debug("Finish Countdown Timer " + behavior_instance.name)
+                    group = findGroup(element["group"]["rid"])
+                    if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b":  # Bright scene
+                        logging.info("Apply Bright scene to group " + group.name)
+                        group.setV1Action(state={"ct": 247, "bri": 1})
+                        sleep(1)
+                        group.setV1Action(state={"on": True})
+                        group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"] * 60 * 10})
+                behavior_instance.active = "end_at" in behavior_instance.configuration["when_extended"]
 
+def handleCountdownTimer(behavior_instance: Dict[str, Any]) -> None:
+    """
+    Handle the Countdown Timer routine.
 
-def behaviorScripts():
+    Args:
+        behavior_instance (Dict[str, Any]): The behavior instance to handle.
+    """
+    logging.debug("Start Countdown Timer " + behavior_instance.name)
+    secondsToCount = sum(
+        behavior_instance.configuration["duration"].get(unit, 0) * factor
+        for unit, factor in [("minutes", 60), ("seconds", 1)]
+    )
+    sleep(secondsToCount)
+    for element in behavior_instance.configuration["what"]:
+        if "group" in element:
+            scene = findScene(element)
+            group = findGroup(element["group"]["rid"])
+            if scene:
+                logging.info("Activate scene " + scene.name + " to group " + group.name)
+                putDict = {"recall": {"action": "active"}}
+                scene.activate(putDict)
+            else:
+                logging.info("Apply Bright scene to group " + group.name)
+                group.setV1Action(state={"on": True, "bri": 254, "ct": 247 if element["recall"]["rid"] == "732ff1d9-76a7-4630-aad0-c8acc499bb0b" else 370})
+    behavior_instance.active = False
+    behavior_instance.update_attr({"enabled": False})
+    logging.debug("Finish Countdown Timer " + behavior_instance.name)
+
+def triggerScript(behavior_instance: Dict[str, Any]) -> None:
+    """
+    Trigger the appropriate script based on the behavior instance.
+
+    Args:
+        behavior_instance (Dict[str, Any]): The behavior instance to handle.
+    """
+    if "when_extended" in behavior_instance.configuration and "randomization" in behavior_instance.configuration["when_extended"]:
+        sleep(randrange(behavior_instance.configuration["when_extended"]["randomization"]["minutes"] * 60))
+
+    script_handlers: Dict[str, Callable[[Dict[str, Any]], None]] = {
+        "ff8957e3-2eb9-4699-a0c8-ad2cb3ede704": handleWakeUp,
+        "7e571ac6-f363-42e1-809a-4cbf6523ed72": handleGoToSleep,
+        "7238c707-8693-4f19-9095-ccdc1444d228": handleActivateScene,
+        "e73bc72d-96b1-46f8-aa57-729861f80c78": handleCountdownTimer,
+    }
+
+    script_id = behavior_instance.script_id
+    if script_id in script_handlers:
+        script_handlers[script_id](behavior_instance)
+
+def behaviorScripts() -> List[Dict[str, Any]]:
+    """
+    Return the list of behavior scripts.
+
+    Returns:
+        List[Dict[str, Any]]: The list of behavior scripts.
+    """
     return [{
       "configuration_schema": {
-        "$ref": "basic_goto_sleep_config.json#"
+        "$ref": "goto_sleep_config.json#"
       },
       "description": "Get ready for nice sleep.",
       "id": "7e571ac6-f363-42e1-809a-4cbf6523ed72",
       "metadata": {
         "category": "automation",
-        "name": "Basic go to sleep routine"
+        "name": "Go to sleep routines",
       },
-      "state_schema": {},
-      "supported_features": [],
+      "state_schema": {
+        "$ref": "goto_sleep_state.json#"
+      },
+      "supported_features": [
+        "style_sunset_gts"
+      ],
       "trigger_schema": {
         "$ref": "trigger.json#"
       },
@@ -166,44 +217,9 @@ def behaviorScripts():
       },
       "state_schema": {},
       "supported_features": [
-        "style_sunrise"
+        "style_sunrise",
+        "intensity"
       ],
-      "trigger_schema": {
-        "$ref": "trigger.json#"
-      },
-      "type": "behavior_script",
-      "version": "0.0.1"
-    },
-    {
-      "configuration_schema": {
-        "$ref": "coming_home_config.json#"
-      },
-      "description": "Automatically turn your lights to choosen light states, when you arrive at home.",
-      "id": "fd60fcd1-4809-4813-b510-4a18856a595c",
-      "metadata": {
-        "category": "automation",
-        "name": "Coming home"
-      },
-      "state_schema": {},
-      "supported_features": [],
-      "trigger_schema": {
-        "$ref": "trigger.json#"
-      },
-      "type": "behavior_script",
-      "version": "0.0.1"
-    },
-    {
-      "configuration_schema": {
-        "$ref": "leaving_home_config.json#"
-      },
-      "description": "Automatically turn off your lights when you leave",
-      "id": "0194752a-2d53-4f92-8209-dfdc52745af3",
-      "metadata": {
-        "category": "automation",
-        "name": "Leaving home"
-      },
-      "state_schema": {},
-      "supported_features": [],
       "trigger_schema": {
         "$ref": "trigger.json#"
       },
@@ -283,4 +299,97 @@ def behaviorScripts():
       },
       "type": "behavior_script",
       "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Contact Sensor script",
+      "id": "049008e6-62d7-42ba-b473-d8488cfde600",
+      "metadata": {
+        "category": "accessory",
+        "name": "Contact Sensor"
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Generic switches script",
+      "id": "67d9395b-4403-42cc-b5f0-740b699d67c6",
+      "metadata": {
+        "category": "accessory",
+        "name": "Hue Switches"
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "motion_sensor_config.json#"
+      },
+      "description": "Motion sensor script",
+      "id": "bba79770-19f1-11ec-9621-0242ac130002",
+      "metadata": {
+        "category": "accessory",
+        "name": "Motion Sensor"
+      },
+      "state_schema": {
+        "$ref": "motion_sensor_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1"
+    },
+    {
+      "configuration_schema": {
+        "$ref": "pm_config.json#"
+      },
+      "description": "PM Automation",
+      "id": "db06cabc-c752-4904-9e8f-4ebe98feaa1a",
+      "metadata": {
+        "category": "automation",
+        "name": "PM"
+      },
+      "state_schema": {
+        "$ref": "pm_state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {
+        "$ref": "pm_trigger.json#"
+      },
+      "type": "behavior_script",
+      "version": "0.0.1",
+      "max_number_instances": 1
+    },
+    {
+      "configuration_schema": {
+        "$ref": "config.json#"
+      },
+      "description": "Tap Switch script",
+      "id": "f306f634-acdb-4dd6-bdf5-48dd626d667e",
+      "metadata": {
+        "category": "accessory",
+        "name": "Tap Switch",
+      },
+      "state_schema": {
+        "$ref": "state.json#"
+      },
+      "supported_features": [],
+      "trigger_schema": {},
+      "type": "behavior_script",
+      "version": "0.0.1",
     }]

@@ -1,47 +1,46 @@
 import logManager
 from datetime import datetime, timezone
+from typing import Dict, Any, Optional
 
 logging = logManager.logger.get_logger(__name__)
 
-class Schedule():
-    def __init__(self, data):
-        self.name = data["name"] if "name" in data else "schedule " + \
-            data["id_v1"]
-        self.id_v1 = data["id_v1"]
-        self.description = data["description"] if "description" in data else "none"
-        self.command = data["command"] if "command" in data else {}
-        self.localtime = data["localtime"] if "localtime" in data else None
-        self.created = data["created"] if "created" in data else datetime.now(timezone.utc
-        ).strftime("%Y-%m-%dT%H:%M:%S")
-        self.status = data["status"] if "status" in data else "disabled"
-        self.autodelete = data["autodelete"] if "autodelete" in data else False
-        starttime = None
-        if data["localtime"].startswith("PT") or data["localtime"].startswith("R"):
+class Schedule:
+    def __init__(self, data: Dict[str, Any]) -> None:
+        self.name: str = data.get("name", "schedule " + data["id_v1"])
+        self.id_v1: str = data["id_v1"]
+        self.description: str = data.get("description", "none")
+        self.command: Dict[str, Any] = data.get("command", {})
+        self.localtime: Optional[str] = data.get("localtime")
+        self.created: str = data.get("created", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"))
+        self.status: str = data.get("status", "disabled")
+        self.autodelete: bool = data.get("autodelete", False)
+        starttime: Optional[str] = None
+        if self.localtime and (self.localtime.startswith("PT") or self.localtime.startswith("R")):
             starttime = self.created
-        self.starttime = data["starttime"] if "starttime" in data else starttime
-        self.recycle = data["recycle"] if "recycle" in data else False
+        self.starttime: Optional[str] = data.get("starttime", starttime)
+        self.recycle: bool = data.get("recycle", False)
 
-    def __del__(self):
+    def __del__(self) -> None:
         logging.info(self.name + " schedule was destroyed.")
 
-    def getV1Api(self):
-        result = {}
+    def getV1Api(self) -> Dict[str, Any]:
+        result: Dict[str, Any] = {}
         result["name"] = self.name
         result["description"] = self.description
         result["command"] = self.command
-        if self.localtime != None:
+        if self.localtime is not None:
             result["localtime"] = self.localtime
             result["time"] = self.localtime
         result["created"] = self.created
         result["status"] = self.status
-        if not self.localtime.startswith("W"):
+        if self.localtime and not self.localtime.startswith("W"):
             result["autodelete"] = self.autodelete
-        if self.starttime != None:
+        if self.starttime is not None:
             result["starttime"] = self.starttime
         result["recycle"] = self.recycle
         return result
 
-    def update_attr(self, newdata):
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
         for key, value in newdata.items():
             updateAttribute = getattr(self, key)
             if isinstance(updateAttribute, dict):
@@ -53,8 +52,8 @@ class Schedule():
                 logging.debug("enable timer " + self.name)
                 self.starttime = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
-    def getObjectPath(self):
+    def getObjectPath(self) -> Dict[str, str]:
         return {"resource": "schedules", "id": self.id_v1}
 
-    def save(self):
+    def save(self) -> Dict[str, Any]:
         return self.getV1Api()

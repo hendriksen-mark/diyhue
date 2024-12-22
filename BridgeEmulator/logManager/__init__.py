@@ -1,3 +1,3 @@
-from logManager import logger
+from logManager.logger import Logger
 
-logger = logger.Logger()
+logger = Logger()

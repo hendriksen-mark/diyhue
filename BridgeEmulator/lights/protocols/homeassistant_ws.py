@@ -1,6 +1,7 @@
 import logManager
 from services.homeAssistantWS import connect_if_required, latest_states
 from pprint import pprint
+
 logging = logManager.logger.get_logger(__name__)
 
 def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_state):
@@ -26,18 +27,18 @@ def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_sta
 
     Diy Hue:
     "state": {
-.        "alert": "select",
+        "alert": "select",
         "bri": 249,
         # Either ct, hs or xy
         # If ct then uses ct
         # If xy uses xy
         # If hs uses hue/sat
         "colormode": "xy",
-.        "effect": "none",
+        "effect": "none",
         "ct": 454,
         "hue": 0,
         "on": true,
-.        "reachable": true,
+        "reachable": true,
         "sat": 0,
         "xy": [
             0.478056,
@@ -45,42 +46,51 @@ def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_sta
         ]
     },
     '''
-    # Copy existing state into new dict
-    diyhue_state = {}
-    for key,value in existing_diy_hue_state.items():
-        diyhue_state[key] = value
+    try:
+        diyhue_state = existing_diy_hue_state.copy()
 
-    # Overwrite any values set by the latest HA State
-    reachable = False
-    is_on = False
-    if "state" in ha_state and ha_state['state'] in ['on','off']:
-        reachable = True
-        is_on = ha_state['state'] == 'on'
+        reachable = ha_state.get('state') in ['on', 'off']
+        is_on = ha_state.get('state') == 'on'
 
-    diyhue_state["reachable"] = reachable
-    diyhue_state["on"] = is_on
-    if "attributes" in ha_state and is_on:  # Home assistant only reports attributes if light is on
-        for key, value in ha_state['attributes'].items():
-            if key == "brightness":
-                diyhue_state['bri'] = value
-            if key == "color_temp":
-                diyhue_state['ct'] = value
-                diyhue_state['colormode'] = 'ct'
-            if key == "xy_color":
-                diyhue_state['xy'] = [value[0], value[1]]
-                diyhue_state['colormode'] = 'xy'
+        diyhue_state.update({
+            "reachable": reachable,
+            "on": is_on
+        })
 
-#    logging.info("Translate, in state {}, out state: {}".format(ha_state, diyhue_state))
-    return diyhue_state
+        if is_on and "attributes" in ha_state:
+            attributes = ha_state['attributes']
+            if "brightness" in attributes:
+                diyhue_state['bri'] = attributes['brightness']
+            if "color_temp" in attributes:
+                diyhue_state.update({
+                    'ct': attributes['color_temp'],
+                    'colormode': 'ct'
+                })
+            if "xy_color" in attributes:
+                diyhue_state.update({
+                    'xy': attributes['xy_color'],
+                    'colormode': 'xy'
+                })
+
+        return diyhue_state
+    except Exception as e:
+        logging.error(f"Error translating Home Assistant state to Diy Hue state: {e}")
+        return existing_diy_hue_state
 
 def set_light(light, data):
-    connection = connect_if_required()
-    connection.change_light(light, data)
+    try:
+        connection = connect_if_required()
+        connection.change_light(light, data)
+    except Exception as e:
+        logging.error(f"Error setting light state: {e}")
 
 def get_light_state(light):
-    connect_if_required()
-    entity_id = light.protocol_cfg["entity_id"]
-    homeassistant_state = latest_states[entity_id]
-    existing_diy_hue_state = light.state
-    # pprint(translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, homeassistant_state))
-    return translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, homeassistant_state)
+    try:
+        connect_if_required()
+        entity_id = light.protocol_cfg["entity_id"]
+        homeassistant_state = latest_states.get(entity_id, {})
+        existing_diy_hue_state = light.state
+        return translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, homeassistant_state)
+    except Exception as e:
+        logging.error(f"Error getting light state: {e}")
+        return light.state

@@ -2,108 +2,85 @@ import uuid
 import logManager
 import weakref
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Union
 from HueObjects import genV2Uuid, v1StateToV2, v2StateToV1, setGroupAction, StreamEvent
 
 logging = logManager.logger.get_logger(__name__)
 
-class Group():
+class Group:
+    def __init__(self, data: Dict[str, Any]) -> None:
+        self.name: str = data.get("name", f"Group {data['id_v1']}")
+        self.id_v1: str = data["id_v1"]
+        self.id_v2: str = data.get("id_v2", genV2Uuid())
+        self.owner: Optional[str] = data.get("owner")
+        self.icon_class: str = data.get("class", data.get("icon_class", "Other"))
+        self.lights: List[weakref.ReferenceType] = []
+        self.action: Dict[str, Union[bool, int, str, List[float]]] = {
+            "on": False, "bri": 100, "hue": 0, "sat": 254, "effect": "none", "xy": [0.0, 0.0], "ct": 153, "alert": "none", "colormode": "xy"
+        }
+        self.sensors: List[weakref.ReferenceType] = []
+        self.type: str = data.get("type", "LightGroup")
+        self.state: Dict[str, bool] = {"all_on": False, "any_on": False}
+        self.dxState: Dict[str, Optional[bool]] = {"all_on": None, "any_on": None}
 
-    def __init__(self, data):
-        self.name = data["name"] if "name" in data else "Group " + \
-            data["id_v1"]
-        self.id_v1 = data["id_v1"]
-        self.id_v2 = data["id_v2"] if "id_v2" in data else genV2Uuid()
-        if "owner" in data:
-            self.owner = data["owner"]
-        self.icon_class = data["class"] if "class" in data else data["icon_class"] if "icon_class" in data else "Other"
-        self.lights = []
-        self.action = {"on": False, "bri": 100, "hue": 0, "sat": 254, "effect": "none", "xy": [
-            0.0, 0.0], "ct": 153, "alert": "none", "colormode": "xy"}
-        self.sensors = []
-        self.type = data["type"] if "type" in data else "LightGroup"
-        self.state = {"all_on": False, "any_on": False}
-        self.dxState = {"all_on": None, "any_on": None}
+        self._send_stream_event(self._get_v2_group(), "add")
 
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Room() if self.type == "Room" else self.getV2Zone()],
-                         "id": str(uuid.uuid4()),
-                         "type": "add"
-                         }
-        StreamEvent(streamMessage)
+    def groupZeroStream(self, rooms: List[str], lights: List[str]) -> None:
+        """
+        Sends a stream event for group zero with the provided rooms and lights.
 
-    def groupZeroStream(self, rooms, lights):
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"children": [], "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'bridge_home')),  "id_v1":"/groups/0", "type": "bridge_home"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
+        Args:
+            rooms (List[str]): List of room IDs.
+            lights (List[str]): List of light IDs.
+        """
+        streamMessage = {
+            "data": [{"children": [], "id": str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'bridge_home')), "id_v1": "/groups/0", "type": "bridge_home"}],
+        }
         for room in rooms:
-            streamMessage["data"][0]["children"].append(
-                {"rid": room, "rtype": "room"})
+            streamMessage["data"][0]["children"].append({"rid": room, "rtype": "room"})
         for light in lights:
-            streamMessage["data"][0]["children"].append(
-                {"rid": light, "rtype": "light"})
-        StreamEvent(streamMessage)
+            streamMessage["data"][0]["children"].append({"rid": light, "rtype": "light"})
+        self._send_stream_event(streamMessage["data"][0], "update")
 
-    def __del__(self):
-        # Groupper light
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.id_v2,  "id_v1": "/groups/" + self.id_v1, "type": "grouped_light"}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
-        streamMessage["id_v1"] = "/groups/" + self.id_v1
-        StreamEvent(streamMessage)
-        ### room / zone ####
-        elementId = self.getV2Room(
-        )["id"] if self.type == "Room" else self.getV2Zone()["id"]
-        elementType = "room" if self.type == "Room" else "zone"
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": elementId,  "id_v1": "/groups/" + self.id_v1, "type": elementType}],
-                         "id": str(uuid.uuid4()),
-                         "type": "delete"
-                         }
-        StreamEvent(streamMessage)
-        logging.info(self.name + " group was destroyed.")
+    def __del__(self) -> None:
+        """
+        Destructor for the Group class. Sends a delete stream event and logs the destruction.
+        """
+        self._send_stream_event({"id": self.id_v2, "id_v1": f"/groups/{self.id_v1}", "type": "grouped_light"}, "delete")
+        element = self._get_v2_group()
+        self._send_stream_event({"id": element["id"], "id_v1": f"/groups/{self.id_v1}", "type": element["type"]}, "delete")
+        logging.info(f"{self.name} group was destroyed.")
 
-    def add_light(self, light):
+    def add_light(self, light: Any) -> None:
+        """
+        Adds a light to the group and sends the appropriate stream events.
+
+        Args:
+            light (Any): The light object to add.
+        """
         self.lights.append(weakref.ref(light))
-        elementId = self.getV2Room(
-        )["id"] if self.type == "Room" else self.getV2Zone()["id"]
-        elementType = "room" if self.type == "Room" else "zone"
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"alert": {"action_values": ["breathe"]}, "id": self.id_v2, "id_v1": "/groups/" + self.id_v1, "on":{"on": self.action["on"]}, "type": "grouped_light", }],
-                         "id": str(uuid.uuid4()),
-                         "type": "add"
-                         }
-        StreamEvent(streamMessage)
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"grouped_services": [{"rid": self.id_v2, "rtype": "grouped_light"}], "id": elementId, "id_v1": "/groups/" + self.id_v1, "type": elementType}],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
+        element = self._get_v2_group()
+        self._send_stream_event({"alert": {"action_values": ["breathe"]}, "id": self.id_v2, "id_v1": f"/groups/{self.id_v1}", "on": {"on": self.action["on"]}, "type": "grouped_light"}, "add")
+        self._send_stream_event({"grouped_services": [{"rid": self.id_v2, "rtype": "grouped_light"}], "id": element["id"], "id_v1": f"/groups/{self.id_v1}", "type": element["type"]}, "update")
+        self._update_group_children_and_services(element)
 
-        StreamEvent(streamMessage)
-        groupChildrens = []
-        groupServices = []
-        for light in self.lights:
-            if light():
-                groupChildrens.append(
-                    {"rid": light().getDevice()["id"], "rtype": "device"})
-                groupServices.append({"rid": light().id_v2, "rtype": "light"})
-        groupServices.append({"rid": self.id_v2, "rtype": "grouped_light"})
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"children": groupChildrens, "id": elementId, "id_v1": "/groups/" + self.id_v1, "services": groupServices, "type": elementType}],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
-        StreamEvent(streamMessage)
+    def add_sensor(self, sensor: Any) -> None:
+        """
+        Adds a sensor to the group.
 
-    def add_sensor(self, sensor):
+        Args:
+            sensor (Any): The sensor object to add.
+        """
         self.sensors.append(weakref.ref(sensor))
 
-    def update_attr(self, newdata):
-        if "lights" in newdata:  # update of the lights must be done using add_light function
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
+        """
+        Updates the group's attributes with the provided data.
+
+        Args:
+            newdata (Dict[str, Any]): Dictionary containing the new attribute values.
+        """
+        if "lights" in newdata:
             del newdata["lights"]
         if "class" in newdata:
             newdata["icon_class"] = newdata.pop("class")
@@ -114,211 +91,266 @@ class Group():
                 setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
+        self._send_stream_event(self._get_v2_group(), "update")
 
-        streamMessage = {"creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [self.getV2Room() if self.type == "Room" else self.getV2Zone()],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
-        StreamEvent(streamMessage)
+    def update_state(self) -> Dict[str, Union[bool, int]]:
+        """
+        Updates and returns the group's state.
 
-    def update_state(self):
+        Returns:
+            Dict[str, Union[bool, int]]: Dictionary containing the updated state.
+        """
         all_on = True
         any_on = False
         bri = 0
         lights_on = 0
-        if len(self.lights) == 0:
+        if not self.lights:
             all_on = False
-        for light in self.lights:
-            if light():
-                if light().state["on"]:
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                if light_instance.state["on"]:
                     any_on = True
-                    if "bri" in light().state:
-                        bri = bri + light().state["bri"]
-                        lights_on = lights_on + 1
+                    if "bri" in light_instance.state:
+                        bri += light_instance.state["bri"]
+                        lights_on += 1
                 else:
                     all_on = False
         if any_on:
-            bri = (((bri/lights_on)/254)*100) if bri > 0 else 0
+            bri = (((bri / lights_on) / 254) * 100) if bri > 0 else 0
         return {"all_on": all_on, "any_on": any_on, "avr_bri": int(bri)}
 
-    def setV2Action(self, state):
+    def setV2Action(self, state: Dict[str, Any]) -> None:
+        """
+        Sets the V2 action for the group and generates a stream event.
+
+        Args:
+            state (Dict[str, Any]): The state to set.
+        """
         v1State = v2StateToV1(state)
+        state.pop("controlled_service", None)
         setGroupAction(self, v1State)
         self.genStreamEvent(state)
 
-    def setV1Action(self, state, scene=None):
+    def setV1Action(self, state: Dict[str, Any], scene: Optional[Any] = None) -> None:
+        """
+        Sets the V1 action for the group and generates a stream event.
+
+        Args:
+            state (Dict[str, Any]): The state to set.
+            scene (Optional[Any]): The scene to set, if any.
+        """
         setGroupAction(self, state, scene)
         v2State = v1StateToV2(state)
         self.genStreamEvent(v2State)
 
-    def genStreamEvent(self, v2State):
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                               "data": [],
-                                 "id": str(uuid.uuid4()),
-                                 "type": "update"
-                                 }
-        for num, light in enumerate(self.lights):
-            if light():
-                streamMessage["data"].insert(num,{
-                    "id": light().id_v2,
-                    "id_v1": "/lights/" + light().id_v1,
-                    "owner": {
-                        "rid": light().getDevice()["id"],
-                        "rtype":"device"
-                    },
-                    "service_id": light().protocol_cfg["light_nr"]-1 if "light_nr" in light().protocol_cfg else 0,
+    def genStreamEvent(self, v2State: Dict[str, Any]) -> None:
+        """
+        Generates and sends a stream event with the provided V2 state.
+
+        Args:
+            v2State (Dict[str, Any]): The V2 state to include in the stream event.
+        """
+        streamMessage = {"data": []}
+        for num, light_ref in enumerate(self.lights):
+            light_instance = light_ref()
+            if light_instance:
+                streamMessage["data"].insert(num, {
+                    "id": light_instance.id_v2,
+                    "id_v1": f"/lights/{light_instance.id_v1}",
+                    "owner": {"rid": light_instance.getDevice()["id"], "rtype": "device"},
+                    "service_id": light_instance.protocol_cfg.get("light_nr", 1) - 1,
                     "type": "light"
                 })
                 streamMessage["data"][num].update(v2State)
-        StreamEvent(streamMessage)
+        self._send_stream_event(streamMessage["data"], "update")
 
         if "on" in v2State:
             v2State["dimming"] = {"brightness": self.update_state()["avr_bri"]}
-        streamMessage = {"creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                         "data": [{"id": self.id_v2,"id_v1": "/groups/" + self.id_v1, "type": "grouped_light",
-                                   "owner": {
-                                       "rid": self.getV2Room()["id"] if self.type == "Room" else self.getV2Zone()["id"],
-                                       "rtype": "room" if self.type == "Room" else "zone"
-                                   }
-                                   }],
-                         "id": str(uuid.uuid4()),
-                         "type": "update"
-                         }
+        streamMessage = {
+            "data": [{
+                "id": self.id_v2,
+                "id_v1": f"/groups/{self.id_v1}",
+                "type": "grouped_light",
+                "owner": {
+                    "rid": self._get_v2_group()["id"],
+                    "rtype": self._get_v2_group()["type"]
+                }
+            }]
+        }
         streamMessage["data"][0].update(v2State)
+        self._send_stream_event(streamMessage["data"][0], "update")
+
+    def _send_stream_event(self, data: Dict[str, Any], event_type: str) -> None:
+        """
+        Sends a stream event with the provided data and event type.
+
+        Args:
+            data (Dict[str, Any]): The data to include in the stream event.
+            event_type (str): The type of the event.
+        """
+        streamMessage = {
+            "creationtime": self._current_time(),
+            "data": [data],
+            "id": str(uuid.uuid4()),
+            "type": event_type,
+            "id_v1": f"/groups/{self.id_v1}"
+        }
         StreamEvent(streamMessage)
 
-    def getV1Api(self):
-        result = {}
-        result["name"] = self.name
-        if hasattr(self, "owner"):
+    def _current_time(self) -> str:
+        """
+        Returns the current time in ISO format.
+
+        Returns:
+            str: The current time in ISO format.
+        """
+        return datetime.now(timezone.utc).isoformat()
+
+    def getV1Api(self) -> Dict[str, Any]:
+        """
+        Returns the V1 API representation of the group.
+
+        Returns:
+            Dict[str, Any]: The V1 API representation of the group.
+        """
+        result = {"name": self.name}
+        if hasattr(self, "owner") and self.owner is not None:
             result["owner"] = self.owner.username
-        lights = []
-        for light in self.lights:
-            if light():
-                lights.append(light().id_v1)
-        sensors = []
-        for sensor in self.sensors:
-            if sensor():
-                sensors.append(sensor().id_v1)
-        result["lights"] = lights
-        result["sensors"] = sensors
+        result["lights"] = [light().id_v1 for light in self.lights if light()]
+        result["sensors"] = [sensor().id_v1 for sensor in self.sensors if sensor()]
         result["type"] = self.type.capitalize()
         result["state"] = self.update_state()
         result["recycle"] = False
         if self.id_v1 == "0":
-            result["presence"] = {
-                "state": {"presence": None, "presence_all": None, "lastupdated": "none"}}
-            result["lightlevel"] = {"state": {"dark": None, "dark_all": None, "daylight": None, "daylight_any": None,
-                                              "lightlevel": None, "lightlevel_min": None, "lightlevel_max": None, "lastupdated": "none"}}
+            result["presence"] = {"state": {"presence": None, "presence_all": None, "lastupdated": "none"}}
+            result["lightlevel"] = {"state": {"dark": None, "dark_all": None, "daylight": None, "daylight_any": None, "lightlevel": None, "lightlevel_min": None, "lightlevel_max": None, "lastupdated": "none"}}
         else:
             result["class"] = self.icon_class.capitalize() if len(self.icon_class) > 2 else self.icon_class.upper()
         result["action"] = self.action
         return result
 
-    def getV2Room(self):
-        result = {"children": [], "services": []}
-        for light in self.lights:
-            if light():
-                result["children"].append({
-                    "rid": str(uuid.uuid5(
-                        uuid.NAMESPACE_URL, light().id_v2 + 'device')),
-                    "rtype": "device"
-                })
+    def _get_v2_group(self) -> Dict[str, Any]:
+        """
+        Returns the V2 group representation based on the group's type.
 
-        #result["grouped_services"].append({
-        #    "rid": self.id_v2,
-        #    "rtype": "grouped_light"
-        #})
+        Returns:
+            Dict[str, Any]: The V2 group representation.
+        """
+        if self.type == "Room":
+            return self.getV2Room()
+        return self.getV2Zone()
+
+    def getV2Room(self) -> Dict[str, Any]:
+        """
+        Returns the V2 room representation of the group.
+
+        Returns:
+            Dict[str, Any]: The V2 room representation.
+        """
+        result = {"children": [], "services": [], "type": "room"}
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                result["children"].append({"rid": str(uuid.uuid5(uuid.NAMESPACE_URL, light_instance.id_v2 + 'device')), "rtype": "device"})
         result["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'room'))
-        result["id_v1"] = "/groups/" + self.id_v1
-        result["metadata"] = {
-            "archetype": self.icon_class.replace(" ", "_").replace("'", "").lower(),
-            "name": self.name
-        }
-        for light in self.lights:
-            if light():
-                result["services"].append({
-                    "rid": light().id_v2,
-                    "rtype": "light"
-                })
-
-        result["services"].append({
-            "rid": self.id_v2,
-            "rtype": "grouped_light"
-        })
-
-        result["type"] = "room"
+        result["id_v1"] = f"/groups/{self.id_v1}"
+        result["metadata"] = {"archetype": self.icon_class.replace(" ", "_").replace("'", "").lower(), "name": self.name}
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                result["services"].append({"rid": light_instance.id_v2, "rtype": "light"})
+        result["services"].append({"rid": self.id_v2, "rtype": "grouped_light"})
         return result
 
-    def getV2Zone(self):
-        result = {"children": [], "services": []}
-        for light in self.lights:
-            if light():
-                result["children"].append({
-                    "rid": light().id_v2,
-                    "rtype": "light"
-                })
+    def getV2Zone(self) -> Dict[str, Any]:
+        """
+        Returns the V2 zone representation of the group.
 
-        #result["grouped_services"].append({
-        #    "rid": self.id_v2,
-        #    "rtype": "grouped_light"
-        #})
+        Returns:
+            Dict[str, Any]: The V2 zone representation.
+        """
+        result = {"children": [], "services": [], "type": "zone"}
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                result["children"].append({"rid": light_instance.id_v2, "rtype": "light"})
         result["id"] = str(uuid.uuid5(uuid.NAMESPACE_URL, self.id_v2 + 'zone'))
-        result["id_v1"] = "/groups/" + self.id_v1
-        result["metadata"] = {
-            "archetype": self.icon_class.replace(" ", "_").replace("'", "").lower(),
-            "name": self.name
-        }
-        for light in self.lights:
-            if light():
-                result["services"].append({
-                    "rid": light().id_v2,
-                    "rtype": "light"
-                })
-
-        result["services"].append({
-            "rid": self.id_v2,
-            "rtype": "grouped_light"
-        })
-
-        result["type"] = "zone"
+        result["id_v1"] = f"/groups/{self.id_v1}"
+        result["metadata"] = {"archetype": self.icon_class.replace(" ", "_").replace("'", "").lower(), "name": self.name}
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                result["services"].append({"rid": light_instance.id_v2, "rtype": "light"})
+        result["services"].append({"rid": self.id_v2, "rtype": "grouped_light"})
         return result
 
-    def getV2GroupedLight(self):
-        result = {}
-        result["alert"] = {
-            "action_values": [
-                "breathe"
-            ]
+    def getV2GroupedLight(self) -> Dict[str, Any]:
+        """
+        Returns the V2 grouped light representation of the group.
+
+        Returns:
+            Dict[str, Any]: The V2 grouped light representation.
+        """
+        result = {
+            "alert": {"action_values": ["breathe"]},
+            "color": {},
+            "dimming": {"brightness": self.update_state()["avr_bri"]},
+            "dimming_delta": {},
+            "dynamics": {},
+            "id": self.id_v2,
+            "id_v1": f"/groups/{self.id_v1}",
+            "on": {"on": self.update_state()["any_on"]},
+            "type": "grouped_light",
+            "signaling": {"signal_values": ["no_signal", "on_off"]}
         }
-        result["color"] = {}
-        result["dimming"] = {"brightness": self.update_state()["avr_bri"]}
-        result["dimming_delta"] = {}
-        result["dynamics"] = {}
-        result["id"] = self.id_v2
-        result["id_v1"] = "/groups/" + self.id_v1
-        result["on"] = {"on": self.update_state()["any_on"]}
-        result["type"] = "grouped_light"
-        if hasattr(self, "owner"):
-            result["owner"] = {"rid": self.owner.username, "rtype": "device"}
+        if hasattr(self, "owner") and self.owner is not None:
+            apiuser = self.owner.username
+            if len(apiuser) == 32:
+                apiuser = f"{apiuser[:8]}-{apiuser[8:12]}-{apiuser[12:16]}-{apiuser[16:20]}-{apiuser[20:]}"
+            result["owner"] = {"rid": apiuser, "rtype": "device"}
         else:
             result["owner"] = {"rid": self.id_v2, "rtype": "device"}
-        result["signaling"] = {"signal_values": [
-            "no_signal",
-            "on_off"]}
-
         return result
 
-    def getObjectPath(self):
+    def getObjectPath(self) -> Dict[str, str]:
+        """
+        Returns the object path for the group.
+
+        Returns:
+            Dict[str, str]: The object path for the group.
+        """
         return {"resource": "groups", "id": self.id_v1}
 
-    def save(self):
-        result = {"id_v2": self.id_v2, "name": self.name, "class": self.icon_class,
-                  "lights": [], "action": self.action, "type": self.type}
+    def save(self) -> Dict[str, Any]:
+        """
+        Saves and returns the group's data.
+
+        Returns:
+            Dict[str, Any]: The group's data.
+        """
+        result = {"id_v2": self.id_v2, "name": self.name, "class": self.icon_class, "lights": [], "action": self.action, "type": self.type}
         if hasattr(self, "owner"):
             result["owner"] = self.owner.username
-        for light in self.lights:
-            if light():
-                result["lights"].append(light().id_v1)
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                result["lights"].append(light_instance.id_v1)
         return result
+
+    def _update_group_children_and_services(self, element: Dict[str, Any]) -> None:
+        """
+        Updates the group's children and services and sends a stream event.
+
+        Args:
+            element (Dict[str, Any]): The element to update.
+        """
+        groupChildren = []
+        groupServices = []
+        for light_ref in self.lights:
+            light_instance = light_ref()
+            if light_instance:
+                groupChildren.append({"rid": light_instance.getDevice()["id"], "rtype": "device"})
+                groupServices.append({"rid": light_instance.id_v2, "rtype": "light"})
+        groupServices.append({"rid": self.id_v2, "rtype": "grouped_light"})
+        self._send_stream_event({"children": groupChildren, "id": element["id"], "id_v1": f"/groups/{self.id_v1}", "services": groupServices, "type": element["type"]}, "update")

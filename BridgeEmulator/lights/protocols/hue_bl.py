@@ -1,5 +1,6 @@
 import logManager
 from functions.colors import convert_xy
+import asyncio
 logging = logManager.logger.get_logger(__name__)
 Connections = {}
 
@@ -32,17 +33,23 @@ class Lamp(object):
     async def connect(self):
         # reinitialize BleakClient for every connection to avoid errors
         self.client = BleakClient(self.address)
-        await self.client.connect()
-
-        model = await self.get_model()
         try:
-            self.converter = Converter(get_light_gamut(model))
-        except ValueError:
-            self.converter = Converter(GamutC)
+            await self.client.connect()
+            logging.info(f"Connected to {self.address}")
+            model = await self.get_model()
+            try:
+                self.converter = Converter(get_light_gamut(model))
+            except ValueError:
+                self.converter = Converter(GamutC)
+        except Exception as e:
+            logging.error(f"Failed to connect to {self.address}: {e}")
+            self.client = None
 
     async def disconnect(self):
-        await self.client.disconnect()
-        self.client = None
+        if self.client:
+            await self.client.disconnect()
+            logging.info(f"Disconnected from {self.address}")
+            self.client = None
 
     async def get_model(self):
         """Returns the model string"""
@@ -94,7 +101,7 @@ def connect(light):
         c = Connections[ip]
     else:
         c = Lamp(ip)
-        c.connect()
+        asyncio.run(c.connect())
         Connections[ip] = c
     return c
 
@@ -102,12 +109,12 @@ def set_light(light, data):
     c = connect(light)
     for key, value in data.items():
         if key == "on":
-            c.set_power(value)
+            asyncio.run(c.set_power(value))
         if key == "bri":
-            c.set_brightness(value / 254)
+            asyncio.run(c.set_brightness(value / 254))
         if key == "xy":
             color = convert_xy(value[0], value[1], light.state["bri"])
-            c.set_color_rgb(color[0] / 254, color[1] / 254, color[2] / 254)
+            asyncio.run(c.set_color_rgb(color[0] / 254, color[1] / 254, color[2] / 254))
 
 def get_light_state(light):
     return {}

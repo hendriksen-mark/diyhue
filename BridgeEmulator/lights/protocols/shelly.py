@@ -7,13 +7,22 @@ logging = logManager.logger.get_logger(__name__)
 #bridgeConfig = configManager.bridgeConfig.yaml_config
 #newLights = configManager.runtimeConfig.newLights
 
+def is_json(content):
+    try:
+        json.loads(content)
+    except ValueError:
+        return False
+    return True
+
+
 def discover(detectedLights, device_ips):
     logging.debug('shelly: <discover> invoked!')
     for ip in device_ips:
         try:
             logging.debug('shelly: probing ip ' + ip)
             response = requests.get('http://' + ip + '/shelly', timeout = 5)
-            if response.status_code == 200:
+            response.raise_for_status()
+            if response.content and is_json(response.content):  # Check if response content is valid JSON
                 logging.debug('Shelly: ' + ip + ' is a shelly device ')
                 device_data = json.loads(response.text)
 
@@ -49,8 +58,8 @@ def discover(detectedLights, device_ips):
                     detectedLights.append({'protocol': 'shelly', 'name': name, 'modelid': 'LOM001', 'protocol_cfg': config})
                 else:
                     logging.info('Shelly: ' + ip + ' is not supported ')
-        except Exception as exception:
-            logging.debug('Shelly: IP ' + ip + ' is unknown device, ' + str(exception))
+        except requests.RequestException as e:
+            logging.info(f"ip {ip} is unknown device: {e}")
 
 def set_light(light, data):
     config = light.protocol_cfg

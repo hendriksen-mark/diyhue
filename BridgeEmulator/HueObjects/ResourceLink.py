@@ -1,46 +1,50 @@
 import logManager
+from typing import Dict, List, Any
 
 logging = logManager.logger.get_logger(__name__)
 
-class ResourceLink():
-    def __init__(self, data):
-        self.name = data["name"]
-        self.id_v1 = data["id_v1"]
-        self.classid = data["classid"]
-        self.description = data["description"] if "description" in data else ""
-        self.links = data["links"] if "links" in data else []
-        self.owner = data["owner"]
-        self.recycle = data["recycle"] if "recycle" in data else False
+class ResourceLink:
+    def __init__(self, data: Dict[str, Any]) -> None:
+        self.name: str = data["name"]
+        self.id_v1: str = data["id_v1"]
+        self.classid: int = data["classid"]
+        self.description: str = data.get("description", "")
+        self.links: List[str] = data.get("links", [])
+        self.owner: Any = data["owner"]
+        self.recycle: bool = data.get("recycle", False)
 
-    def __del__(self):
+    def __del__(self) -> None:
         logging.info(self.name + " ResourceLink was destroyed.")
 
-    def add_link(self, link):
-        self.links.append("/" + link.getObjectPath()
-                          ["resource"] + "/" + link.getObjectPath()["id"])
+    def add_link(self, link: Any) -> None:
+        self.links.append("/" + link.getObjectPath()["resource"] + "/" + link.getObjectPath()["id"])
 
-    def getObjectPath(self):
+    def getObjectPath(self) -> Dict[str, str]:
         return {"resource": "resourcelinks", "id": self.id_v1}
 
-    def getV1Api(self):
-        result = {}
-        result["name"] = self.name
-        result["description"] = self.description
-        result["type"] = "Link"
-        result["classid"] = self.classid
-        result["owner"] = self.owner.username
-        result["recycle"] = self.recycle
-        result["links"] = self.links
+    def getV1Api(self) -> Dict[str, Any]:
+        result = {
+            "name": self.name,
+            "description": self.description,
+            "type": "Link",
+            "classid": self.classid,
+            "owner": self.owner.username if hasattr(self.owner, 'username') else None,
+            "recycle": self.recycle,
+            "links": self.links
+        }
         return result
 
-    def update_attr(self, newdata):
+    def update_attr(self, newdata: Dict[str, Any]) -> None:
         for key, value in newdata.items():
-            updateAttribute = getattr(self, key)
-            if isinstance(updateAttribute, dict):
-                updateAttribute.update(value)
-                setattr(self, key, updateAttribute)
+            if hasattr(self, key):
+                updateAttribute = getattr(self, key)
+                if isinstance(updateAttribute, dict):
+                    updateAttribute.update(value)
+                    setattr(self, key, updateAttribute)
+                else:
+                    setattr(self, key, value)
             else:
-                setattr(self, key, value)
+                logging.warning(f"Attempted to update non-existent attribute {key} for ResourceLink {self.name}")
 
-    def save(self):
+    def save(self) -> Dict[str, Any]:
         return self.getV1Api()

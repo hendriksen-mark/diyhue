@@ -127,12 +127,14 @@ def v2BridgeZigBeeDiscovery():
 
 def v2GeofenceClient():
     user = authorizeV2(request.headers)
-    result = {
-      "id": str(uuid.uuid5(uuid.NAMESPACE_URL, request.headers["hue-application-key"])),
-      "name": user["user"].name,
-      "type": "geofence_client"
-    }
-    return result
+    if "user" in user:
+        result = {
+            "id": str(uuid.uuid5(uuid.NAMESPACE_URL, request.headers["hue-application-key"])),
+            "name": user["user"].name,
+            "type": "geofence_client"
+        }
+        return result
+    return {"id": "", "name": "", "type": "geofence_client"}
 
 
 def v2BridgeHome():
@@ -246,7 +248,7 @@ class ClipV2(Resource):
         for key, light in bridgeConfig["lights"].items():
             data.append(light.getDevice())
         for key, sensor in bridgeConfig["sensors"].items():
-            if sensor.getDevice() != None:
+            if sensor.getDevice() is not None:
                 data.append(sensor.getDevice())
         # bridge
         data.append(v2Bridge())
@@ -256,7 +258,7 @@ class ClipV2(Resource):
         for key, light in bridgeConfig["lights"].items():
             data.append(light.getZigBee())
         for key, sensor in bridgeConfig["sensors"].items():
-            if sensor.getZigBee() != None:
+            if sensor.getZigBee() is not None:
                 data.append(sensor.getZigBee())
         data.append(v2BridgeZigBeeDiscovery())
         # entertainment
@@ -296,24 +298,23 @@ class ClipV2(Resource):
             data.append(script)
         for key, sensor in bridgeConfig["sensors"].items():
             motion = sensor.getMotion()
-            if motion != None:
+            if motion is not None:
                 data.append(motion)
             buttons = sensor.getButtons()
-            if len(buttons) != 0:
+            if buttons is not None:
                 for button in buttons:
                     data.append(button)
             power = sensor.getDevicePower()
-            if power != None:
+            if power is not None:
                 data.append(power)
             rotarys = sensor.getRotary()
-            if len(rotarys) != 0:
-                for rotary in rotarys:
-                    data.append(rotary)
+            if rotarys is not None:
+                data.append(rotarys)
             temperature = sensor.getTemperature()
-            if temperature != None:
+            if temperature is not None:
                 data.append(temperature)
             lightlevel = sensor.getLightlevel()
-            if lightlevel != None:
+            if lightlevel is not None:
                 data.append(lightlevel)
 
         return {"errors": [], "data": data}
@@ -349,11 +350,11 @@ class ClipV2Resource(Resource):
         elif resource == "zigbee_connectivity":
             for key, light in bridgeConfig["lights"].items():
                 zigbee = light.getZigBee()
-                if zigbee != None:
+                if zigbee is not None:
                     response["data"].append(zigbee)
             for key, sensor in bridgeConfig["sensors"].items():
                 zigbee = sensor.getZigBee()
-                if zigbee != None:
+                if zigbee is not None:
                     response["data"].append(zigbee)
             response["data"].append(v2BridgeZigBee())  # the bridge
         elif resource == "entertainment":
@@ -369,7 +370,7 @@ class ClipV2Resource(Resource):
                 response["data"].append(light.getDevice())
             for key, sensor in bridgeConfig["sensors"].items():
                 device = sensor.getDevice()
-                if device != None:
+                if device is not None:
                     response["data"].append(device)
             response["data"].append(v2BridgeDevice())  # the bridge
         elif resource == "zigbee_device_discovery":
@@ -395,34 +396,33 @@ class ClipV2Resource(Resource):
         elif resource == "motion":
             for key, sensor in bridgeConfig["sensors"].items():
                 motion = sensor.getMotion()
-                if motion != None:
+                if motion is not None:
                     response["data"].append(motion)
         elif resource == "device_power":
             for key, sensor in bridgeConfig["sensors"].items():
                 power = sensor.getDevicePower()
-                if power != None:
+                if power is not None:
                     response["data"].append(power)
         elif resource == "button":
             for key, sensor in bridgeConfig["sensors"].items():
                 buttons = sensor.getButtons()
-                if len(buttons) != 0:
+                if buttons is not None:
                     for button in buttons:
                         response["data"].append(button)
         elif resource == "relative_rotary":
             for key, sensor in bridgeConfig["sensors"].items():
                 rotarys = sensor.getRotary()
-                if len(rotarys) != 0:
-                    for rotary in rotarys:
-                        response["data"].append(rotary)
+                if rotarys is not None:
+                    response["data"].append(rotarys)
         elif resource == "temperature":
             for key, sensor in bridgeConfig["sensors"].items():
                 temperature = sensor.getTemperature()
-                if temperature != None:
+                if temperature is not None:
                     response["data"].append(temperature)
         elif resource == "light_level":
             for key, sensor in bridgeConfig["sensors"].items():
                 lightlevel = sensor.getLightlevel()
-                if lightlevel != None:
+                if lightlevel is not None:
                     response["data"].append(lightlevel)
         else:
             response["errors"].append({"description": "Not Found"})
@@ -570,40 +570,45 @@ class ClipV2ResourceId(Resource):
             return "", 403
         object = getObject(resource, resourceid)
         if not object:
-            return {"errors": [], "data": []}
+            return {"errors": [{"description": "Not Found"}], "data": []}
 
+        data = []
         if resource in ["scene", "light", "smart_scene"]:
-            return {"errors": [], "data": [object.getV2Api()]}
+            data.append(object.getV2Api())
         elif resource == "room":
-            return {"errors": [], "data": [object.getV2Room()]}
+            data.append(object.getV2Room())
         elif resource == "zone":
-            return {"errors": [], "data": [object.getV2Zone()]}
+            data.append(object.getV2Zone())
         elif resource == "grouped_light":
-            return {"errors": [], "data": [object.getV2GroupedLight()]}
+            data.append(object.getV2GroupedLight())
         elif resource == "device":
-            return {"errors": [], "data": [object.getDevice()]}
+            data.append(object.getDevice())
         elif resource == "zigbee_connectivity":
-            return {"errors": [], "data": [object.getZigBee()]}
+            data.append(object.getZigBee())
         elif resource == "zigbee_device_discovery":
-            return {"errors": [], "data": [object.getZigBeeDiscovery()]}
+            data.append(object.getZigBeeDiscovery())
         elif resource == "entertainment":
-            return {"errors": [], "data": [object.getV2Entertainment()]}
+            data.append(object.getV2Entertainment())
         elif resource == "entertainment_configuration":
-            return {"errors": [], "data": [object.getV2Api()]}
+            data.append(object.getV2Api())
         elif resource == "bridge":
-            return {"errors": [], "data": [v2Bridge()]}
+            data.append(v2Bridge())
         elif resource == "motion":
-            return {"errors": [], "data": [object.getMotion()]}
+            data.append(object.getMotion())
         elif resource == "device_power":
-            return {"errors": [], "data": [object.getDevicePower()]}
+            data.append(object.getDevicePower())
         elif resource == "button":
-            return {"errors": [], "data": [object.getButtons()]}
+            data.append(object.getButtons())
         elif resource == "relative_rotary":
-            return {"errors": [], "data": [object.getRotary()]}
+            data.append(object.getRotary())
         elif resource == "temperature":
-            return {"errors": [], "data": [object.getTemperature()]}
+            data.append(object.getTemperature())
         elif resource == "light_level":
-            return {"errors": [], "data": [object.getLightlevel()]}
+            data.append(object.getLightlevel())
+        else:
+            return {"errors": [{"description": "Not Found"}], "data": []}
+
+        return {"errors": [], "data": data}
 
     def put(self, resource, resourceid):
         logging.debug(request.headers)
@@ -614,6 +619,7 @@ class ClipV2ResourceId(Resource):
         logging.info(putDict)
         object = getObject(resource, resourceid)
         if resource == "light":
+            putDict["controlled_service"] = "manual"
             object.setV2State(putDict)
         elif resource == "entertainment_configuration":
             if "action" in putDict:
@@ -653,6 +659,7 @@ class ClipV2ResourceId(Resource):
             if "metadata" in putDict:
                 object.name = putDict["metadata"]["name"]
         elif resource == "grouped_light":
+            putDict["controlled_service"] = "manual"
             object.setV2Action(putDict)
         elif resource == "geolocation":
             bridgeConfig["sensors"]["1"].protocol_cfg = {
@@ -684,7 +691,6 @@ class ClipV2ResourceId(Resource):
                 object.update_attr(attrs)
         elif resource == "zigbee_device_discovery":
             if putDict["action"]["action_type"] == "search":
-                bridgeConfig["config"]["zigbee_device_discovery_info"]["status"] = "active"
                 Thread(target=scanForLights).start()
         elif resource == "device":
             if "identify" in putDict and putDict["identify"]["action"] == "identify":

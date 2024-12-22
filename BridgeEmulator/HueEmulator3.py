@@ -2,12 +2,14 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api
+from werkzeug.security import check_password_hash
 from threading import Thread
 import ssl
+import os  # Import os module
 import configManager
 import logManager
 import flask_login
-from flaskUI.core import User #dummy import for flaks_login module
+from flaskUI.core import User # dummy import for flask_login module
 from flaskUI.restful import NewUser, ShortConfig, EntireConfig, ResourceElements, Element, ElementParam, ElementParamId
 from flaskUI.v2restapi import AuthV1, ClipV2, ClipV2Resource, ClipV2ResourceId
 from flaskUI.espDevices import Switch
@@ -15,17 +17,20 @@ from flaskUI.Credits import Credits
 from werkzeug.serving import WSGIRequestHandler
 from functions.daylightSensor import daylightSensor
 
+# Initialize configurations and logging
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
 _ = logManager.logger.get_logger("werkzeug")
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
-app = Flask(__name__, template_folder='flaskUI/templates',static_url_path="/assets", static_folder='flaskUI/assets')
+
+# Initialize Flask app and API
+app = Flask(__name__, template_folder='flaskUI/templates', static_url_path="/assets", static_folder='flaskUI/assets')
 api = Api(app)
 cors = CORS(app, resources={r"*": {"origins": "*"}})
-
-app.config['SECRET_KEY'] = 'change_this_to_be_secure'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24))  # Load from environment variable or generate a random key
 api.app.config['RESTFUL_JSON'] = {'ensure_ascii': False}
 
+# Initialize Flask-Login
 login_manager = flask_login.LoginManager()
 # We can now pass in our app to the login manager
 login_manager.init_app(app)
@@ -35,7 +40,7 @@ login_manager.login_view = "core.login"
 @login_manager.user_loader
 def user_loader(email):
     if email not in bridgeConfig["config"]["users"]:
-        return
+        return None  # Explicitly return None
 
     user = User()
     user.id = email
@@ -45,17 +50,21 @@ def user_loader(email):
 def request_loader(request):
     email = request.form.get('email')
     if email not in bridgeConfig["config"]["users"]:
-        return
+        return None  # Explicitly return None
 
     user = User()
     user.id = email
 
     # DO NOT ever store passwords in plaintext and always compare password
     # hashes using constant-time comparison!
-    print(email)
-    user.is_authenticated = request.form['password'] == bridgeConfig["config"]["users"][email]["password"]
-
+    # print(email)  # Remove print statement
+    logging.info(f"Authentication attempt for user: {email}")
+    user.is_authenticated = compare_passwords(request.form['password'], bridgeConfig["config"]["users"][email]["password"])
     return user
+
+def compare_passwords(input_password, stored_password):
+    # Implement a secure password comparison (e.g., using bcrypt)
+    return check_password_hash(stored_password, input_password)
 
 ### Licence/credits
 api.add_resource(Credits, '/licenses/<string:resource>', strict_slashes=False)
@@ -94,10 +103,26 @@ def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
     ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
     ctx.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256')
     ctx.set_ecdh_curve('prime256v1')
-    app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
+    ctx.check_hostname = False  # Disable hostname checking
+    ctx.verify_mode = ssl.CERT_NONE  # Disable certificate verification
+    try:
+        app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
+    except ssl.SSLError as ssl_error:
+        logging.error(f"SSL error occurred: {ssl_error}")
+    except OSError as e:
+        if e.errno == 98:
+            logging.error(f"HTTPS server could not start on port {HOST_HTTPS_PORT}. The port is already in use.")
+        else:
+            logging.error(f"HTTPS server failed to start: {e}")
 
 def runHttp(BIND_IP, HOST_HTTP_PORT):
-    app.run(host=BIND_IP, port=HOST_HTTP_PORT)
+    try:
+        app.run(host=BIND_IP, port=HOST_HTTP_PORT)
+    except OSError as e:
+        if e.errno == 98:
+            logging.error(f"HTTP server could not start on port {HOST_HTTP_PORT}. The port is already in use.")
+        else:
+            logging.error(f"HTTP server failed to start: {e}")
 
 if __name__ == '__main__':
     from services import mqtt, deconz, ssdp, mdns, scheduler, remoteApi, remoteDiscover, entertainment, stateFetch, eventStreamer, homeAssistantWS, updateManager
@@ -128,6 +153,7 @@ if __name__ == '__main__':
     Thread(target=mdns.mdnsListener, args=[HOST_IP, HOST_HTTP_PORT, "BSB002", bridgeConfig["config"]["bridgeid"]]).start()
     Thread(target=scheduler.runScheduler).start()
     Thread(target=eventStreamer.messageBroker).start()
+
     if not DISABLE_HTTPS:
         Thread(target=runHttps, args=[BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH]).start()
     runHttp(BIND_IP, HOST_HTTP_PORT)
