@@ -2,7 +2,7 @@ import uuid
 import logManager
 from HueObjects import genV2Uuid, StreamEvent
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 logging = logManager.logger.get_logger(__name__)
 
@@ -17,22 +17,10 @@ class BehaviorInstance:
         self.active: bool = data.get("active", False)
         self.script_id: str = data.get("script_id", "")
 
-        streamMessage = {
-            "creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "data": [self.getV2Api()],
-            "id": str(uuid.uuid4()),
-            "type": "add"
-        }
-        StreamEvent(streamMessage)
+        self._send_stream_event(self.getV2Api(), "add")
 
     def __del__(self) -> None:
-        streamMessage = {
-            "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "data": [{"id": self.id_v2, "type": "behavior_instance"}],
-            "id": str(uuid.uuid4()),
-            "type": "delete"
-        }
-        StreamEvent(streamMessage)
+        self._send_stream_event({"id": self.id_v2, "type": "behavior_instance"}, "delete")
         logging.info(f"{self.name} behaviour instance was destroyed.")
 
     def activate(self, data: Dict[str, Any]) -> None:
@@ -80,16 +68,19 @@ class BehaviorInstance:
                 setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
+        self._send_stream_event(self.getV2Api(), "update")
+
+    def _send_stream_event(self, data: Dict[str, Any], event_type: str) -> None:
         streamMessage = {
-            "creationtime": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "data": [self.getV2Api()],
+            "creationtime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "data": [data],
             "id": str(uuid.uuid4()),
-            "type": "update"
+            "type": event_type,
         }
         StreamEvent(streamMessage)
 
     def save(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {
+        return {
             "id": self.id_v2,
             "metadata": {"name": self.name},
             "configuration": self.configuration,
@@ -97,4 +88,3 @@ class BehaviorInstance:
             "active": self.active,
             "script_id": self.script_id
         }
-        return result
