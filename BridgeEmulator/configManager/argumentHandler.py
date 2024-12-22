@@ -24,10 +24,11 @@ def get_environment_variable(var: str, boolean: bool = False) -> Union[str, bool
         boolean (bool): Whether to interpret the value as a boolean.
     """
     value = getenv(var)
-    if value is None:
-        return False if boolean else None
-    if boolean:
-        return value.lower() == "true"
+    if boolean and value:
+        if value.lower() == "true":
+            value = True
+        else:
+            value = False
     return value
 
 def generate_certificate(mac: str, path: str) -> None:
