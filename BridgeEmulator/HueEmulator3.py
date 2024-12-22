@@ -109,7 +109,7 @@ def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
         logging.error(f"SSL error occurred: {ssl_error}")
     except OSError as e:
         if e.errno == 98:
-            logging.error(f"HTTPS server could not start on port {HOST_HTTPS_PORT}. The port is already in use. {e.errno}")
+            logging.error(f"HTTPS server could not start on host:port {BIND_IP}:{HOST_HTTPS_PORT}. The port is already in use. {e.errno}")
         else:
             logging.error(f"HTTPS server failed to start: {e}")
 
@@ -118,7 +118,7 @@ def runHttp(BIND_IP, HOST_HTTP_PORT):
         app.run(host=BIND_IP, port=HOST_HTTP_PORT)
     except OSError as e:
         if e.errno == 98:
-            logging.error(f"HTTP server could not start on port {HOST_HTTP_PORT}. The port is already in use. {e.errno}")
+            logging.error(f"HTTP server could not start on host:port {BIND_IP}:{HOST_HTTP_PORT}. The port is already in use. {e.errno}")
         else:
             logging.error(f"HTTP server failed to start: {e}")
 
@@ -132,11 +132,6 @@ if __name__ == '__main__':
     HOST_HTTPS_PORT = configManager.runtimeConfig.arg["HTTPS_PORT"]
     CONFIG_PATH = configManager.runtimeConfig.arg["CONFIG_PATH"]
     DISABLE_HTTPS = configManager.runtimeConfig.arg["noServeHttps"]
-
-    if not DISABLE_HTTPS:
-        Thread(target=runHttps, args=[BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH]).start()
-    runHttp(BIND_IP, HOST_HTTP_PORT)
-
     updateManager.startupCheck()
 
     Thread(target=daylightSensor, args=[bridgeConfig["config"]["timezone"], bridgeConfig["sensors"]["1"]]).start()
@@ -156,3 +151,7 @@ if __name__ == '__main__':
     Thread(target=mdns.mdnsListener, args=[HOST_IP, HOST_HTTP_PORT, "BSB002", bridgeConfig["config"]["bridgeid"]]).start()
     Thread(target=scheduler.runScheduler).start()
     Thread(target=eventStreamer.messageBroker).start()
+
+    if not DISABLE_HTTPS:
+        Thread(target=runHttps, args=[BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH]).start()
+    runHttp(BIND_IP, HOST_HTTP_PORT)
