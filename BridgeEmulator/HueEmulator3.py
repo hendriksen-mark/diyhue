@@ -27,7 +27,7 @@ WSGIRequestHandler.protocol_version = "HTTP/1.1"
 app = Flask(__name__, template_folder='flaskUI/templates', static_url_path="/assets", static_folder='flaskUI/assets')
 api = Api(app)
 cors = CORS(app, resources={r"*": {"origins": "*"}})
-app.config['SECRET_KEY'] = 'change_this_to_be_secure'
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24))  # Load from environment variable or generate a random key
 api.app.config['RESTFUL_JSON'] = {'ensure_ascii': False}
 
 # Initialize Flask-Login
@@ -103,24 +103,10 @@ def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
     ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
     ctx.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256')
     ctx.set_ecdh_curve('prime256v1')
-    try:
-        app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
-    except ssl.SSLError as ssl_error:
-        logging.error(f"SSL error occurred: {ssl_error}")
-    except OSError as e:
-        if e.errno == 98:
-            logging.error(f"HTTPS server could not start on port {HOST_HTTPS_PORT}. The port is already in use. {e.errno}")
-        else:
-            logging.error(f"HTTPS server failed to start: {e}")
+    app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
 
 def runHttp(BIND_IP, HOST_HTTP_PORT):
-    try:
-        app.run(host=BIND_IP, port=HOST_HTTP_PORT)
-    except OSError as e:
-        if e.errno == 98:
-            logging.error(f"HTTP server could not start on port {HOST_HTTP_PORT}. The port is already in use. {e.errno}")
-        else:
-            logging.error(f"HTTP server failed to start: {e}")
+    app.run(host=BIND_IP, port=HOST_HTTP_PORT)
 
 if __name__ == '__main__':
     from services import mqtt, deconz, ssdp, mdns, scheduler, remoteApi, remoteDiscover, entertainment, stateFetch, eventStreamer, homeAssistantWS, updateManager
