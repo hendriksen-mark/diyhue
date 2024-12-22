@@ -27,7 +27,7 @@ WSGIRequestHandler.protocol_version = "HTTP/1.1"
 app = Flask(__name__, template_folder='flaskUI/templates', static_url_path="/assets", static_folder='flaskUI/assets')
 api = Api(app)
 cors = CORS(app, resources={r"*": {"origins": "*"}})
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24))  # Load from environment variable or generate a random key
+app.config['SECRET_KEY'] = 'change_this_to_be_secure'
 api.app.config['RESTFUL_JSON'] = {'ensure_ascii': False}
 
 # Initialize Flask-Login
