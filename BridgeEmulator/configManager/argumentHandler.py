@@ -22,9 +22,6 @@ def get_environment_variable(var: str, boolean: bool = False) -> Union[str, bool
     Args:
         var (str): The name of the environment variable.
         boolean (bool): Whether to interpret the value as a boolean.
-
-    Returns:
-        str or bool: The value of the environment variable, or False if boolean and not set.
     """
     value = getenv(var)
     if value is None:
@@ -40,9 +37,6 @@ def generate_certificate(mac: str, path: str) -> None:
     Args:
         mac (str): The MAC address.
         path (str): The path to save the certificate.
-
-    Returns:
-        None
     """
     logging.info("Generating certificate")
     serial = (mac[:6] + "fffe" + mac[-6:]).encode('utf-8')
@@ -59,47 +53,10 @@ def process_arguments(configDir: str, args: Dict[str, Union[str, bool]]) -> None
     Args:
         configDir (str): The configuration directory.
         args (dict): The command-line arguments.
-
-    Returns:
-        None
     """
     configure_logging(args["DEBUG"])
     if not path.isfile(path.join(configDir, "cert.pem")):
         generate_certificate(args["MAC"], configDir)
-
-def configure_logging(debug: bool) -> None:
-    """
-    Configure logging based on the debug flag.
-
-    Args:
-        debug (bool): Whether to enable debug logging.
-
-    Returns:
-        None
-    """
-    if debug:
-        logging.info("Debug logging enabled!")
-    else:
-        logManager.logger.configure_logger("INFO")
-        logging.info("Debug logging disabled!")
-
-def set_argument(argumentDict: Dict[str, Union[str, bool]], key: str, arg_value: Optional[Union[str, bool]], env_var: str, default: Optional[Union[str, bool]] = None, boolean: bool = False) -> None:
-    """
-    Set an argument value in the argument dictionary.
-
-    Args:
-        argumentDict (dict): The dictionary to store arguments.
-        key (str): The key for the argument.
-        arg_value: The value from the command-line argument.
-        env_var (str): The environment variable name.
-        default: The default value if neither arg_value nor env_var is set.
-        boolean (bool): Whether to interpret the value as a boolean.
-
-    Returns:
-        None
-    """
-    value = arg_value if arg_value else get_environment_variable(env_var, boolean)
-    argumentDict[key] = value if value else default
 
 def parse_arguments() -> Dict[str, Union[str, bool]]:
     """
@@ -133,6 +90,34 @@ def parse_arguments() -> Dict[str, Union[str, bool]]:
 
     return argumentDict
 
+def configure_logging(debug: bool) -> None:
+    """
+    Configure logging based on the debug flag.
+
+    Args:
+        debug (bool): Whether to enable debug logging.
+    """
+    if debug:
+        logging.info("Debug logging enabled!")
+    else:
+        logManager.logger.configure_logger("INFO")
+        logging.info("Debug logging disabled!")
+
+def set_argument(argumentDict: Dict[str, Union[str, bool]], key: str, arg_value: Optional[Union[str, bool]], env_var: str, default: Optional[Union[str, bool]] = None, boolean: bool = False) -> None:
+    """
+    Set an argument value in the argument dictionary.
+
+    Args:
+        argumentDict (dict): The dictionary to store arguments.
+        key (str): The key for the argument.
+        arg_value: The value from the command-line argument.
+        env_var (str): The environment variable name.
+        default: The default value if neither arg_value nor env_var is set.
+        boolean (bool): Whether to interpret the value as a boolean.
+    """
+    value = arg_value if arg_value else get_environment_variable(env_var, boolean)
+    argumentDict[key] = value if value else default
+
 def initialize_argument_dict() -> Dict[str, Union[str, bool]]:
     """
     Initialize the argument dictionary with default values.
@@ -150,9 +135,6 @@ def add_arguments(ap: argparse.ArgumentParser) -> None:
 
     Args:
         ap (argparse.ArgumentParser): The argument parser.
-
-    Returns:
-        None
     """
     ap.add_argument("--debug", action='store_true', help="Enables debug output")
     ap.add_argument("--bind-ip", help="The IP address to listen on", type=str, default='0.0.0.0')
@@ -178,9 +160,6 @@ def set_arguments_from_args_and_env(argumentDict: Dict[str, Union[str, bool]], a
     Args:
         argumentDict (dict): The dictionary to store arguments.
         args (argparse.Namespace): The parsed command-line arguments.
-
-    Returns:
-        None
     """
     set_argument(argumentDict, "DEBUG", args.debug, 'DEBUG', False, True)
     set_argument(argumentDict, "CONFIG_PATH", args.config_path, 'CONFIG_PATH')
@@ -198,9 +177,6 @@ def log_deprecated_warnings(args: argparse.Namespace) -> None:
 
     Args:
         args (argparse.Namespace): The parsed command-line arguments.
-
-    Returns:
-        None
     """
     for arg, warning in DEPRECATED_WARNINGS.items():
         if getattr(args, arg) or get_environment_variable(arg.upper()):
@@ -268,9 +244,6 @@ def validate_mac_address(mac: str) -> None:
 
     Args:
         mac (str): The MAC address to validate.
-
-    Returns:
-        None
     """
     if mac.capitalize() == "XXXXXXXXXXXX" or mac == "":
         logging.error(f"No valid MAC address provided {mac}")
