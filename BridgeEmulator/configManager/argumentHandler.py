@@ -98,8 +98,8 @@ def set_argument(argumentDict: Dict[str, Union[str, bool]], key: str, arg_value:
     Returns:
         None
     """
-    value = arg_value if arg_value is not None else get_environment_variable(env_var, boolean)
-    argumentDict[key] = value if value is not None else default
+    value = arg_value if arg_value else get_environment_variable(env_var, boolean)
+    argumentDict[key] = value if value else default
 
 def parse_arguments() -> Dict[str, Union[str, bool]]:
     """
