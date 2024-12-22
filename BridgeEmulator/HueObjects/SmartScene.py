@@ -91,6 +91,7 @@ class SmartScene:
             updateAttribute = getattr(self, key)
             if isinstance(updateAttribute, dict):
                 updateAttribute.update(value)
+                setattr(self, key, updateAttribute)
             else:
                 setattr(self, key, value)
 
