@@ -282,7 +282,6 @@ class Config:
             if tzset is not None:
                 tzset()
             if "whitelist" in config:
-                logging.debug("Loading whitelist")
                 for user, data in config["whitelist"].items():
 
                     self.yaml_config["apiUsers"][user] = ApiUser.ApiUser(user, data["name"], data["client_key"], data["create_date"], data["last_use_date"])
@@ -290,7 +289,6 @@ class Config:
             config = self._set_default_config_values(config)
             config = self._upgrade_config(config)
             self.yaml_config["config"] = config
-            logging.debug(self.yaml_config["apiUsers"])
 
             self._load_lights()
             self._load_groups()
@@ -434,7 +432,7 @@ class Config:
         _write_yaml(f"{self.configDir}/config_debug.yaml", debug)
         _write_yaml(f"{self.configDir}/system_info.yaml", info)
         subprocess.run(f'tar --exclude=\'config.yaml\' -cvf {self.configDir}/config_debug.tar {self.configDir}/*.yaml {self.runningDir}/*.log* ', shell=True, capture_output=True, text=True)
-        #subprocess.run(f'rm -r {self.configDir}/config_debug.yaml', check=True)
+        subprocess.run(f'rm -r {self.configDir}/config_debug.yaml', check=True)
         return f"{self.configDir}/config_debug.tar"
 
     def write_args(self, args: Dict[str, Any]) -> None:
