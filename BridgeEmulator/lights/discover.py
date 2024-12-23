@@ -4,7 +4,7 @@ import socket
 import json
 import uuid
 from datetime import datetime, timezone
-from lights.protocols import tpkasa, wled, mqtt, hyperion, yeelight, hue, deconz, native_multi, tasmota, shelly, esphome, tradfri, elgato
+from lights.protocols import tpkasa, wled, mqtt, hyperion, yeelight, hue, deconz, native_multi, tasmota, shelly, esphome, tradfri, elgato, govee
 from services import homeAssistantWS
 from HueObjects import Light, StreamEvent
 from functions.core import nextFreeId
@@ -160,6 +160,8 @@ def discover_lights(detectedLights, device_ips):
         elgato_ips = find_hosts(9123)
         logging.info(pretty_json(elgato_ips))
         elgato.discover(detectedLights, elgato_ips)
+    if bridgeConfig["config"]["govee"]["enabled"]:
+        govee.discover(detectedLights, elgato_ips)
 
 def scanForLights():  # scan for ESP8266 lights and strips
     logging.info("scan for light")
