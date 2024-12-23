@@ -161,7 +161,7 @@ def discover_lights(detectedLights, device_ips):
         logging.info(pretty_json(elgato_ips))
         elgato.discover(detectedLights, elgato_ips)
     if bridgeConfig["config"]["govee"]["enabled"]:
-        govee.discover(detectedLights, elgato_ips)
+        govee.discover(detectedLights)
 
 def scanForLights():  # scan for ESP8266 lights and strips
     logging.info("scan for light")

@@ -16,7 +16,7 @@ def get_headers():
         "Content-Type": "application/json"
     }
 
-def discover(detectedLights, device_ips):
+def discover(detectedLights):
     logging.debug("Govee: <discover> invoked!")
     response = requests.get(f"{BASE_URL}/devices", headers=get_headers())
     response.raise_for_status()
