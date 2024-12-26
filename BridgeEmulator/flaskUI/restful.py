@@ -441,7 +441,6 @@ class ElementParam(Resource):
         currentTime = datetime.now()
         logging.info(putDict)
         if resource == "lights" and param == "state":  # state is applied to a light
-            logging.debug(putDict)
             bridgeConfig[resource][resourceid].setV1State(putDict)
         elif param == "action":  # state is applied to a light
             if "scene" in putDict:
