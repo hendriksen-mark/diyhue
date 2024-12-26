@@ -29,7 +29,7 @@ def syncWithLights(off_if_unreachable: bool) -> None:
                         new_state: Dict[str, Any] = protocol.get_light_state(light)
                         logging.debug(new_state)
                         light.state.update(new_state)
-                        light.state["reachable"] = True
+                        light.state["reachable"] = new_state.get("reachable", True)
                     except Exception as e:
                         light.state["reachable"] = False
                         if off_if_unreachable:
