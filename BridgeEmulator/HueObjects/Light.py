@@ -89,6 +89,8 @@ class Light:
             self.updateLightState(state)
             for key, value in state.items():
                 if key in self.state:
+                    if value is "lselect":
+                        value = "select"
                     self.state[key] = value
                 if key in self.config:
                     if key == "archetype":
