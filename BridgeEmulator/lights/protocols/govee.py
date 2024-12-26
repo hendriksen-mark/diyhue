@@ -23,6 +23,13 @@ def get_headers() -> Dict[str, str]:
         "Content-Type": "application/json"
     }
 
+def is_json(content):
+    try:
+        json.loads(content)
+    except ValueError:
+        return False
+    return True
+
 def discover(detectedLights: List[Dict[str, Any]]) -> None:
     """
     Discover Govee lights and append them to the detectedLights list.
@@ -33,15 +40,17 @@ def discover(detectedLights: List[Dict[str, Any]]) -> None:
     logging.debug("Govee: <discover> invoked!")
     try:
         response = requests.get(f"{BASE_URL}/devices", headers=get_headers())
-        devices = response.json().get("data", {})
-        for device in devices:
-            device_id = device["device"]
-            device_name = device.get("deviceName", f'{device["sku"]}-{device_id.replace(":","")[10:]}')
-            capabilities = [function["type"] for function in device["capabilities"]]
-            if has_capabilities(capabilities, ["on_off", "segment_color_setting"]):
-                handle_segmented_device(device, device_name, detectedLights)
-            elif has_capabilities(capabilities, ["on_off", "color_setting"]):
-                handle_non_segmented_device(device, device_name, detectedLights)
+        response.raise_for_status()
+        if response.content and is_json(response.content):  # Check if response content is valid JSON
+            devices = response.json().get("data", {})
+            for device in devices:
+                device_id = device["device"]
+                device_name = device.get("deviceName", f'{device["sku"]}-{device_id.replace(":","")[10:]}')
+                capabilities = [function["type"] for function in device["capabilities"]]
+                if has_capabilities(capabilities, ["on_off", "segment_color_setting"]):
+                    handle_segmented_device(device, device_name, detectedLights)
+                elif has_capabilities(capabilities, ["on_off", "color_setting"]):
+                    handle_non_segmented_device(device, device_name, detectedLights)
     except requests.RequestException as e:
         logging.error("Error connecting to Govee: %s", e)
         return None
