@@ -90,9 +90,6 @@ class Light:
             for key, value in state.items():
                 if key in self.state:
                     logging.debug(f"Set '{key}' to '{value}' for {self.name}")
-                    if key is "alert" and value not in ["select", "none"]:
-                        value = "select"
-                    logging.debug(f"Set '{key}' to '{value}' for {self.name}")
                     self.state[key] = value
                 if key in self.config:
                     if key == "archetype":
