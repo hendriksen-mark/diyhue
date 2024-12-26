@@ -2,13 +2,10 @@ import json
 import requests
 import logManager
 from functions.colors import convert_rgb_xy, convert_xy, hsv_to_rgb
-import configManager
 from typing import List, Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
-bridgeConfig = configManager.bridgeConfig.yaml_config
 
-API_KEY = bridgeConfig["config"]["govee"].get('api_key', '')
 BASE_URL = "https://openapi.api.govee.com/router/api/v1/"
 BASE_TYPE = "devices.capabilities."
 
@@ -19,8 +16,10 @@ def get_headers() -> Dict[str, str]:
     Returns:
         dict: Headers including API key and content type.
     """
+    import configManager
+    bridgeConfig = configManager.bridgeConfig.yaml_config
     return {
-        "Govee-API-Key": API_KEY,
+        "Govee-API-Key": bridgeConfig["config"]["govee"].get('api_key', ''),
         "Content-Type": "application/json"
     }
 
