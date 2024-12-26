@@ -31,17 +31,19 @@ def discover(detectedLights: List[Dict[str, Any]]) -> None:
         detectedLights (list): List to append discovered lights to.
     """
     logging.debug("Govee: <discover> invoked!")
-    response = requests.get(f"{BASE_URL}/devices", headers=get_headers())
-    response.raise_for_status()
-    devices = response.json().get("data", {})
-    for device in devices:
-        device_id = device["device"]
-        device_name = device.get("deviceName", f'{device["sku"]}-{device_id.replace(":","")[10:]}')
-        capabilities = [function["type"] for function in device["capabilities"]]
-        if has_capabilities(capabilities, ["on_off", "segment_color_setting"]):
-            handle_segmented_device(device, device_name, detectedLights)
-        elif has_capabilities(capabilities, ["on_off", "color_setting"]):
-            handle_non_segmented_device(device, device_name, detectedLights)
+    try:
+        response = requests.get(f"{BASE_URL}/devices", headers=get_headers())
+        devices = response.json().get("data", {})
+        for device in devices:
+            device_id = device["device"]
+            device_name = device.get("deviceName", f'{device["sku"]}-{device_id.replace(":","")[10:]}')
+            capabilities = [function["type"] for function in device["capabilities"]]
+            if has_capabilities(capabilities, ["on_off", "segment_color_setting"]):
+                handle_segmented_device(device, device_name, detectedLights)
+            elif has_capabilities(capabilities, ["on_off", "color_setting"]):
+                handle_non_segmented_device(device, device_name, detectedLights)
+    except requests.RequestException as e:
+            logging.error("Error connecting to Govee: %s", e)
 
 def has_capabilities(capabilities: List[str], required_capabilities: List[str]) -> bool:
     """
