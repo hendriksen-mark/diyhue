@@ -43,7 +43,8 @@ def discover(detectedLights: List[Dict[str, Any]]) -> None:
             elif has_capabilities(capabilities, ["on_off", "color_setting"]):
                 handle_non_segmented_device(device, device_name, detectedLights)
     except requests.RequestException as e:
-            logging.error("Error connecting to Govee: %s", e)
+        logging.error("Error connecting to Govee: %s", e)
+        return None
 
 def has_capabilities(capabilities: List[str], required_capabilities: List[str]) -> bool:
     """
