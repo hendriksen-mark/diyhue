@@ -420,8 +420,10 @@ class Config:
             debug["hue"]["hueKey"] = "privately"
         if debug["tradfri"]:
             debug["tradfri"]["psk"] = "privately"
-        if debug["alarm"]["enabled"]:
+        if debug["alarm"]["enabled"] or "email" in debug["alarm"]:
             debug["alarm"]["email"] = "privately"
+        if debug["govee"]["enabled"] or "api_key" in debug["govee"]:
+            debug["govee"]["api_key"] = "privately"
         info = {}
         info["OS"] = os.uname().sysname
         info["Architecture"] = os.uname().machine
