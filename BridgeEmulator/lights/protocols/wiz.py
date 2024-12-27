@@ -1,17 +1,19 @@
 import json
 import socket
 import logManager
-#import configManager
 from functions.colors import convert_xy, hsv_to_rgb
-
+from typing import Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
 
-def discover(detectedLights):
-    pass
+def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the light state based on the provided data.
 
-
-def set_light(light, data):
+    Args:
+        light (Any): The light object containing protocol configuration and state.
+        data (Dict[str, Any]): The data dictionary containing light state parameters.
+    """
     ip = light.protocol_cfg["ip"]
     payload = {}
     transitiontime = 400
@@ -46,11 +48,20 @@ def set_light(light, data):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
     sock.sendto(udpmsg, (ip, 38899))
 
+def translateRange(value: float, leftMin: float, leftMax: float, rightMin: float, rightMax: float) -> float:
+    """
+    Translate a value from one range to another.
 
-def get_light_state(light):
-    return {}
+    Args:
+        value (float): The value to translate.
+        leftMin (float): The minimum value of the original range.
+        leftMax (float): The maximum value of the original range.
+        rightMin (float): The minimum value of the target range.
+        rightMax (float): The maximum value of the target range.
 
-def translateRange(value, leftMin, leftMax, rightMin, rightMax):
+    Returns:
+        float: The translated value in the target range.
+    """
     leftSpan = leftMax - leftMin
     rightSpan = rightMax - rightMin
     valueScaled = float(value - leftMin) / float(leftSpan)

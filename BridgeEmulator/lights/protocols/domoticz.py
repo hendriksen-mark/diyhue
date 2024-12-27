@@ -58,6 +58,3 @@ def get_light_state(light):
     state = {"on": light_data["result"][0]["Status"] != "Off"}
     state["bri"] = int(round(float(light_data["result"][0]["Level"]) / 100 * 255))
     return state
-
-def discover():
-    pass

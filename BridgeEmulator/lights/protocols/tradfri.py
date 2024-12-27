@@ -2,10 +2,18 @@ import json
 import logManager
 from subprocess import check_output
 from functions.colors import convert_rgb_xy, hsv_to_rgb
+from typing import Dict, Any, List
 
 logging = logManager.logger.get_logger(__name__)
 
-def set_light(light, data):
+def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the state of a Tradfri light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+        data (Dict[str, Any]): The data to set on the light.
+    """
     payload = {}
     url = "coaps://" + light.protocol_cfg["ip"] + ":5684/15001/" + str(light.protocol_cfg["id"])
     for key, value in data.items():
@@ -31,15 +39,15 @@ def set_light(light, data):
         if("hue" in data):
             hue = data["hue"]
         else:
-            hue = lights[light]["state"]["hue"]
+            hue = light.state["hue"]
         if("sat" in data):
             sat = data["sat"]
         else:
-            sat = lights[light]["state"]["sat"]
+            sat = light.state["sat"]
         if("bri" in data):
             bri = data["bri"]
         else:
-            bri = lights[light]["state"]["bri"]
+            bri = light.state["bri"]
         rgbValue = hsv_to_rgb(hue, sat, bri)
         xyValue = convert_rgb_xy(rgbValue[0], rgbValue[1], rgbValue[2])
         payload["5709"] = int(xyValue[0] * 65535)
@@ -55,7 +63,16 @@ def set_light(light, data):
     cmd = ["coap-client-gnutls", "-B", "2", "-m", "put", "-u", light.protocol_cfg["identity"], "-k", light.protocol_cfg["psk"], "-e", "{ \"3311\": [" + json.dumps(payload) + "] }", url]
     check_output(cmd)
 
-def get_light_state(light):
+def get_light_state(light: Any) -> Dict[str, Any]:
+    """
+    Get the current state of a Tradfri light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+
+    Returns:
+        Dict[str, Any]: The current state of the light.
+    """
     state ={}
     cmd = ["coap-client-gnutls", "-B", "5", "-m", "get", "-u", light.protocol_cfg["identity"], "-k", light.protocol_cfg["psk"], "coaps://" + light.protocol_cfg["ip"] + ":5684/15001/" + str(light.protocol_cfg["id"])]
     light_data = json.loads(check_output(cmd).decode('utf-8').rstrip('\n').split("\n")[-1])
@@ -73,7 +90,17 @@ def get_light_state(light):
 
     return state
 
-def discover(detectedLights, tradfriConfig):
+def discover(detectedLights: List[Dict[str, Any]], tradfriConfig: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Discover Tradfri lights and add them to the detected lights list.
+
+    Args:
+        detectedLights (List[Dict[str, Any]]): The list of detected lights.
+        tradfriConfig (Dict[str, Any]): The Tradfri configuration.
+
+    Returns:
+        List[Dict[str, Any]]: The updated list of detected lights.
+    """
     if "psk" in tradfriConfig:
         logging.debug("tradfri: <discover> invoked!")
         try:

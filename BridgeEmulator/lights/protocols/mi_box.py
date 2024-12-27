@@ -208,6 +208,3 @@ def sendKelvinCmd(light, kelvin):
 	cmd += bytes([kelvin])
 	cmd += b'\x00\x00\x00'
 	sendCmd(light, cmd)
-
-def get_light_state(light):
-	return 

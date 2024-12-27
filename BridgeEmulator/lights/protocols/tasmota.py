@@ -2,37 +2,67 @@ import json
 import logManager
 import requests
 from functions.colors import convert_rgb_xy, convert_xy, rgbBrightness
+from typing import List, Dict, Any, Union
 
 logging = logManager.logger.get_logger(__name__)
 
-def sendRequest(url, timeout=3):
+def sendRequest(url: str, timeout: int = 3) -> Union[str, None]:
+    """
+    Send a GET request to the specified URL with a JSON header.
 
+    Args:
+        url (str): The URL to send the request to.
+        timeout (int): The timeout for the request in seconds.
+
+    Returns:
+        Union[str, None]: The response text if the request was successful, None otherwise.
+    """
     head = {"Content-type": "application/json"}
-    response = requests.get(url, timeout=timeout, headers=head)
-    return response.text
+    try:
+        response = requests.get(url, timeout=timeout, headers=head)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        logging.error(f"Request to {url} failed: {e}")
+        return None
 
-def is_json(content):
+def is_json(content: str) -> bool:
+    """
+    Check if the given content is valid JSON.
+
+    Args:
+        content (str): The content to check.
+
+    Returns:
+        bool: True if the content is valid JSON, False otherwise.
+    """
     try:
         json.loads(content)
     except ValueError:
         return False
     return True
 
-def discover(detectedLights, device_ips):
+def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> None:
+    """
+    Discover Tasmota devices on the network.
+
+    Args:
+        detectedLights (List[Dict[str, Any]]): The list to append detected lights to.
+        device_ips (List[str]): The list of device IPs to probe.
+    """
     logging.debug("tasmota: <discover> invoked!")
     for ip in device_ips:
         try:
-            logging.debug ( "tasmota: probing ip " + ip)
-            response = requests.get ("http://" + ip + "/cm?cmnd=Status%200", timeout=3)
+            logging.debug(f"tasmota: probing ip {ip}")
+            response = requests.get(f"http://{ip}/cm?cmnd=Status%200", timeout=3)
             response.raise_for_status()
-            if response.content and is_json(response.content):  # Check if response content is valid JSON
+            if response.content and is_json(response.content):
                 device_data = response.json()
-                #logging.debug(pretty_json(device_data))
-                if ("StatusSTS" in device_data):
-
-                    logging.debug("tasmota: " + ip + " is a Tasmota device ")
-                    logging.debug ("tasmota: Hostname: " + device_data["StatusNET"]["Hostname"] )
-                    logging.debug ("tasmota: Mac:      " + device_data["StatusNET"]["Mac"] )
+                # logging.debug(pretty_json(device_data))
+                if "StatusSTS" in device_data:
+                    logging.debug(f"tasmota: {ip} is a Tasmota device ")
+                    logging.debug(f"tasmota: Hostname: {device_data["StatusNET"]["Hostname"]}")
+                    logging.debug(f"tasmota: Mac:      {device_data["StatusNET"]["Mac"]}")
 
                     properties = {"rgb": True, "ct": False, "ip": ip, "name": device_data["StatusNET"]["Hostname"], "id": device_data["StatusNET"]["Mac"], "mac": device_data["StatusNET"]["Mac"]}
                     detectedLights.append({"protocol": "tasmota", "name": device_data["StatusNET"]["Hostname"], "modelid": "LCT015", "protocol_cfg": {"ip": ip, "id": device_data["StatusNET"]["Mac"]}})
@@ -40,78 +70,99 @@ def discover(detectedLights, device_ips):
         except requests.RequestException as e:
             logging.info(f"ip {ip} is unknown device: {e}")
 
+def set_light(light: Dict[str, Any], data: Dict[str, Any], rgb: Union[List[int], None] = None) -> None:
+    """
+    Set the state of a Tasmota light.
 
-def set_light(light, data, rgb = None):
-    logging.debug("tasmota: <set_light> invoked! IP=" + light.protocol_cfg["ip"])
-
+    Args:
+        light (Dict[str, Any]): The light configuration.
+        data (Dict[str, Any]): The state data to set.
+        rgb (Union[List[int], None]): The RGB values if available.
+    """
     for key, value in data.items():
-        logging.debug("tasmota: key " + key)
-
         if key == "on":
-            if value:
-                sendRequest ("http://"+light.protocol_cfg["ip"]+"/cm?cmnd=Power%20on")
-            else:
-                sendRequest ("http://"+light.protocol_cfg["ip"]+"/cm?cmnd=Power%20off")
+            url = f"http://{light.protocol_cfg['ip']}/cm?cmnd=Power%20{'on' if value else 'off'}"
+            sendRequest(url)
         elif key == "bri":
             brightness = int(100.0 * (value / 254.0))
-            sendRequest ("http://"+light.protocol_cfg["ip"]+"/cm?cmnd=Dimmer%20" + str(brightness))
+            url = f"http://{light.protocol_cfg['ip']}/cm?cmnd=Dimmer%20{brightness}"
+            sendRequest(url)
         elif key == "ct":
             color = {}
         elif key == "xy":
             if rgb:
                 color = rgbBrightness(rgb, light["state"]["bri"])
             else:
-                color = convert_xy(value[0], value[1], light.state["bri"])
-            sendRequest ("http://"+light.protocol_cfg["ip"]+"/cm?cmnd=Color%20" + str(color[0]) + "," + str(color[1]) + "," + str(color[2]))
+                color = convert_xy(value[0], value[1], light["state"]["bri"])
+            url = f"http://{light.protocol_cfg['ip']}/cm?cmnd=Color%20{color[0]},{color[1]},{color[2]}"
+            sendRequest(url)
         elif key == "alert":
-                if value == "select":
-                    sendRequest ("http://" + light.protocol_cfg["ip"] + "/cm?cmnd=dimmer%20100")
+            if value == "select":
+                url = f"http://{light.protocol_cfg['ip']}/cm?cmnd=dimmer%20100"
+                sendRequest(url)
 
+def hex_to_rgb(value: str) -> List[int]:
+    """
+    Convert a hex color string to an RGB list.
 
-def hex_to_rgb(value):
+    Args:
+        value (str): The hex color string.
+
+    Returns:
+        List[int]: The RGB values.
+    """
     value = value.lstrip('#')
     lv = len(value)
     tup = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
     return list(tup)
 
+def rgb_to_hex(rgb: List[int]) -> str:
+    """
+    Convert an RGB list to a hex color string.
 
-def rgb_to_hex(rgb):
-    return '%02x%02x%02x' % rgb
-    #return '#%02x%02x%02x' % rgb
+    Args:
+        rgb (List[int]): The RGB values.
 
-def get_light_state(light):
-    logging.debug("tasmota: <get_light_state> invoked!")
-    data = sendRequest ("http://" + light.protocol_cfg["ip"] + "/cm?cmnd=Status%2011")
-    #logging.debug(data)
+    Returns:
+        str: The hex color string.
+    """
+    return '%02x%02x%02x' % tuple(rgb)
+    # return '#%02x%02x%02x' % rgb
+
+def get_light_state(light: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get the current state of a Tasmota light.
+
+    Args:
+        light (Dict[str, Any]): The light configuration.
+
+    Returns:
+        Dict[str, Any]: The current state of the light.
+    """
+    data = sendRequest(f"http://{light.protocol_cfg['ip']}/cm?cmnd=Status%2011")
+    if not data:
+        return {}
     light_data = json.loads(data)["StatusSTS"]
-    #logging.debug(light_data)
     state = {}
 
-    if 'POWER'in light_data:
+    if 'POWER' in light_data:
         state['on'] = True if light_data["POWER"] == "ON" else False
-        #logging.debug('POWER')
-    elif 'POWER1'in light_data:
+    elif 'POWER1' in light_data:
         state['on'] = True if light_data["POWER1"] == "ON" else False
-        #logging.debug('POWER1')
 
     if 'Color' not in light_data:
-       #logging.debug('not Color')
-        if state['on'] == True:
-            state["xy"] = convert_rgb_xy(255,255,255)
+        if state['on']:
+            state["xy"] = convert_rgb_xy(255, 255, 255)
             state["bri"] = int(255)
             state["colormode"] = "xy"
     else:
-        #logging.debug('Color')
-        #logging.debug(light_data["Color"])
         if "," in light_data["Color"]:
-            # RGB
             rgb = light_data["Color"].split(",")
-            state["xy"] = convert_rgb_xy(int(rgb[0],16), int(rgb[1],16), int(rgb[2],16))
+            state["xy"] = convert_rgb_xy(int(rgb[0], 16), int(rgb[1], 16), int(rgb[2], 16))
         else:
-            # HEX
             hex = light_data["Color"]
             rgb = hex_to_rgb(hex)
-            state["xy"] = convert_rgb_xy(rgb[0],rgb[1],rgb[2])
+            state["xy"] = convert_rgb_xy(rgb[0], rgb[1], rgb[2])
 
         state["bri"] = int(light_data["Dimmer"] / 100.0 * 254.0)
         state["colormode"] = "xy"

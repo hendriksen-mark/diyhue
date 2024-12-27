@@ -12,6 +12,12 @@ Connections: Dict[str, 'HyperionConnection'] = {}
 PRIORITY = 75
 
 def discover(detectedLights: List[Dict[str, Any]]) -> None:
+    """
+    Discover Hyperion lights on the network.
+
+    Args:
+        detectedLights: A list to append discovered lights to.
+    """
     logging.debug("Hyperion: <discover> invoked!")
     group = ("239.255.255.250", 1900)
     message = "\r\n".join([
@@ -41,7 +47,7 @@ def discover(detectedLights: List[Dict[str, Any]]) -> None:
                 elif line.startswith("LOCATION"):
                     properties["ip"] = line.split(":")[2][2:]
                 elif line.startswith("SERVER"):
-                    properties["version"] = re.match("Hyperion/\S*", line)
+                    properties["version"] = re.match("Hyperion/\\S*", line)
             if "name" in properties:
                 detectedLights.append({"protocol": "hyperion", "name": properties["name"], "modelid": "LCT015", "protocol_cfg": properties})
     except socket.timeout:
@@ -50,11 +56,18 @@ def discover(detectedLights: List[Dict[str, Any]]) -> None:
         sock.close()
 
 def set_light(light: Dict[str, Any], data: Dict[str, Any]) -> None:
-    ip = light["protocol_cfg"]["ip"]
+    """
+    Set the state of a Hyperion light.
+
+    Args:
+        light: The light object containing protocol configuration.
+        data: A dictionary containing the state data to set (e.g., on, bri).
+    """
+    ip = light.protocol_cfg["ip"]
     if ip in Connections:
         c = Connections[ip]
     else:
-        c = HyperionConnection(ip, light["protocol_cfg"]["jss_port"])
+        c = HyperionConnection(ip, light.protocol_cfg["jss_port"])
         Connections[ip] = c
 
     if "on" in data and not data["on"]:
@@ -73,11 +86,20 @@ def set_light(light: Dict[str, Any], data: Dict[str, Any]) -> None:
     c.command(request_data)
 
 def get_light_state(light: Dict[str, Any]) -> Dict[str, Union[bool, Dict[str, Any]]]:
-    ip = light["protocol_cfg"]["ip"]
+    """
+    Get the current state of a Hyperion light.
+
+    Args:
+        light: The light object containing protocol configuration.
+
+    Returns:
+        A dictionary containing the current state of the light (e.g., on, bri).
+    """
+    ip = light.protocol_cfg["ip"]
     if ip in Connections:
         c = Connections[ip]
     else:
-        c = HyperionConnection(ip, light["protocol_cfg"]["jss_port"])
+        c = HyperionConnection(ip, light.protocol_cfg["jss_port"])
         Connections[ip] = c
 
     state = {"on": False}
@@ -107,10 +129,18 @@ class HyperionConnection:
     _host_ip: str = ""
 
     def __init__(self, ip: str, port: str) -> None:
+        """
+        Initialize a Hyperion connection.
+
+        Args:
+            ip: The IP address of the Hyperion server.
+            port: The port of the Hyperion server.
+        """
         self._ip = ip
         self._port = port
 
     def connect(self) -> None:
+        """Connect to the Hyperion server."""
         self.disconnect()
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.settimeout(5)
@@ -118,12 +148,20 @@ class HyperionConnection:
         self._connected = True
 
     def disconnect(self) -> None:
+        """Disconnect from the Hyperion server."""
         self._connected = False
         if self._socket:
             self._socket.close()
         self._socket = None
 
     def send(self, data: bytes, flags: int = 0) -> None:
+        """
+        Send data to the Hyperion server.
+
+        Args:
+            data: The data to send.
+            flags: Optional flags for the send operation.
+        """
         try:
             if not self._connected:
                 self.connect()
@@ -133,6 +171,16 @@ class HyperionConnection:
             raise e
 
     def recv(self, bufsize: int, flags: int = 0) -> bytes:
+        """
+        Receive data from the Hyperion server.
+
+        Args:
+            bufsize: The maximum amount of data to receive at once.
+            flags: Optional flags for the receive operation.
+
+        Returns:
+            The received data.
+        """
         try:
             if not self._connected:
                 self.connect()
@@ -142,6 +190,12 @@ class HyperionConnection:
             raise e
 
     def command(self, data: Dict[str, Any]) -> None:
+        """
+        Send a command to the Hyperion server.
+
+        Args:
+            data: The command data to send.
+        """
         try:
             msg = json.dumps(data) + "\r\n"
             self.send(msg.encode())

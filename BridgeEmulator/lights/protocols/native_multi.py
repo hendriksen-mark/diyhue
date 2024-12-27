@@ -5,7 +5,17 @@ from typing import Dict, List, Any
 
 logging = logManager.logger.get_logger(__name__)
 
-def set_light(light, data):
+def set_light(light: Any, data: Dict[str, Any]) -> str:
+    """
+    Set the state of a light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+        data (Dict[str, Any]): The data to set the light state.
+
+    Returns:
+        str: The response text or error message.
+    """
     lightsData = data.get("lights", {light.protocol_cfg["light_nr"]: data})
     try:
         response = requests.put(f"http://{light.protocol_cfg['ip']}/state", json=lightsData, timeout=3)
@@ -15,7 +25,16 @@ def set_light(light, data):
         logging.error(f"Failed to set light state: {e}")
         return str(e)
 
-def get_light_state(light):
+def get_light_state(light: Any) -> Dict[str, Any]:
+    """
+    Get the state of a light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+
+    Returns:
+        Dict[str, Any]: The current state of the light.
+    """
     try:
         response = requests.get(f"http://{light.protocol_cfg['ip']}/state?light={light.protocol_cfg['light_nr']}", timeout=3)
         response.raise_for_status()
@@ -24,18 +43,47 @@ def get_light_state(light):
         logging.error(f"Failed to get light state: {e}")
         return {}
 
-def generate_light_name(base_name, light_nr):
+def generate_light_name(base_name: str, light_nr: int) -> str:
+    """
+    Generate a light name based on the base name and light number.
+
+    Args:
+        base_name (str): The base name of the light.
+        light_nr (int): The light number.
+
+    Returns:
+        str: The generated light name.
+    """
     suffix = f' {light_nr}'
     return f'{base_name[:32-len(suffix)]}{suffix}'
 
-def is_json(content):
+def is_json(content: str) -> bool:
+    """
+    Check if the content is valid JSON.
+
+    Args:
+        content (str): The content to check.
+
+    Returns:
+        bool: True if the content is valid JSON, False otherwise.
+    """
     try:
         json.loads(content)
     except ValueError:
         return False
     return True
 
-def discover(detectedLights, device_ips):
+def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> List[Dict[str, Any]]:
+    """
+    Discover lights on the network.
+
+    Args:
+        detectedLights (List[Dict[str, Any]]): The list to append detected lights.
+        device_ips (List[str]): The list of device IPs to discover.
+
+    Returns:
+        List[Dict[str, Any]]: The updated list of detected lights.
+    """
     logging.debug("native: <discover> invoked!")
     for ip in device_ips:
         try:

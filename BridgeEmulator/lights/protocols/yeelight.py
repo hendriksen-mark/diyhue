@@ -2,12 +2,22 @@ import logManager
 import yeelight
 from functions.colors import convert_rgb_xy, convert_xy
 from time import sleep
+from typing import List, Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
 Connections = {}
 
 
-def discover(detectedLights):
+def discover(detectedLights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Discover Yeelight bulbs and append them to the detectedLights list.
+
+    Args:
+        detectedLights (List[Dict[str, Any]]): List to append discovered lights to.
+
+    Returns:
+        List[Dict[str, Any]]: Updated list of detected lights.
+    """
     logging.debug("Yeelight: <discover> invoked!")
     discover = yeelight.discover_bulbs()
     for light in discover:
@@ -29,8 +39,17 @@ def discover(detectedLights):
     return detectedLights
 
 
-def connect(light):
-    ip = light.protocol_cfg["ip"]
+def connect(light: Dict[str, Any]) -> yeelight.Bulb:
+    """
+    Connect to a Yeelight bulb.
+
+    Args:
+        light (Dict[str, Any]): Light configuration dictionary.
+
+    Returns:
+        yeelight.Bulb: Connected Yeelight bulb object.
+    """
+    ip = light["protocol_cfg"]["ip"]
     if ip in Connections:
         c = Connections[ip]
     else:
@@ -38,7 +57,14 @@ def connect(light):
         Connections[ip] = c
     return c
 
-def set_light(light, data):
+def set_light(light: Dict[str, Any], data: Dict[str, Any]) -> None:
+    """
+    Set the state of a Yeelight bulb.
+
+    Args:
+        light (Dict[str, Any]): Light configuration dictionary.
+        data (Dict[str, Any]): State data to set on the light.
+    """
     c = connect(light)
     payload = {}
     transitiontime = 400
@@ -77,17 +103,44 @@ def set_light(light, data):
         c.send_command(key, value)
         sleep(0.4)
 
-def hex_to_rgb(value):
+def hex_to_rgb(value: str) -> List[int]:
+    """
+    Convert a hex color string to an RGB list.
+
+    Args:
+        value (str): Hex color string.
+
+    Returns:
+        List[int]: RGB color list.
+    """
     value = value.lstrip('#')
     lv = len(value)
     tup = tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
     return list(tup)
 
 
-def calculate_color_temp(value):
+def calculate_color_temp(value: int) -> int:
+    """
+    Calculate the color temperature from a given value.
+
+    Args:
+        value (int): Input value.
+
+    Returns:
+        int: Calculated color temperature.
+    """
     return int(-(347/4800) * int(value) +(2989900/4800))
 
-def get_light_state(light):
+def get_light_state(light: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get the current state of a Yeelight bulb.
+
+    Args:
+        light (Dict[str, Any]): Light configuration dictionary.
+
+    Returns:
+        Dict[str, Any]: Current state of the light.
+    """
     c = connect(light)
     state = {}
     light_data = c.get_properties()

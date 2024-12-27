@@ -1,13 +1,23 @@
 import json
 import logManager
 import requests
+from typing import List, Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
 
 #bridgeConfig = configManager.bridgeConfig.yaml_config
 #newLights = configManager.runtimeConfig.newLights
 
-def is_json(content):
+def is_json(content: str) -> bool:
+    """
+    Check if the provided content is valid JSON.
+
+    Args:
+        content (str): The content to check.
+
+    Returns:
+        bool: True if content is valid JSON, False otherwise.
+    """
     try:
         json.loads(content)
     except ValueError:
@@ -15,7 +25,14 @@ def is_json(content):
     return True
 
 
-def discover(detectedLights, device_ips):
+def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> None:
+    """
+    Discover Shelly devices on the provided IP addresses and add them to detectedLights.
+
+    Args:
+        detectedLights (List[Dict[str, Any]]): List to store detected lights.
+        device_ips (List[str]): List of device IP addresses to probe.
+    """
     logging.debug('shelly: <discover> invoked!')
     for ip in device_ips:
         try:
@@ -61,9 +78,15 @@ def discover(detectedLights, device_ips):
         except requests.RequestException as e:
             logging.info(f"ip {ip} is unknown device: {e}")
 
-def set_light(light, data):
+def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the state of a Shelly light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+        data (Dict[str, Any]): The data to set on the light.
+    """
     config = light.protocol_cfg
-    logging.debug('Shelly: <set_light> invoked! IP=' + config['ip'])
 
     for key, value in data.items():
         if key == 'on':
@@ -74,9 +97,17 @@ def set_light(light, data):
             else:
                 logging.info('Shelly: <set_light> not implemented api version!')
 
-def get_light_state(light):
+def get_light_state(light: Any) -> Dict[str, Any]:
+    """
+    Get the current state of a Shelly light.
+
+    Args:
+        light (Any): The light object containing protocol configuration.
+
+    Returns:
+        Dict[str, Any]: The current state of the light.
+    """
     config = light.protocol_cfg
-    logging.debug('Shelly: <get_light_state> invoked! IP=' + config['ip'])
 
     state = {}
     if (not 'gen' in config) or (config['gen'] == 1):
@@ -90,12 +121,32 @@ def get_light_state(light):
 
     return state
 
-def request_api_v1(ip, request):
+def request_api_v1(ip: str, request: str) -> Dict[str, Any]:
+    """
+    Make a request to the Shelly API v1.
+
+    Args:
+        ip (str): The IP address of the Shelly device.
+        request (str): The API request to make.
+
+    Returns:
+        Dict[str, Any]: The response data from the API.
+    """
     head = {'Content-type': 'application/json'}
     response = requests.get('http://' + ip + '/' + request, timeout = 5, headers = head)
     return json.loads(response.text) if response.status_code == 200 else {}
 
-def request_api_v2(ip, request):
+def request_api_v2(ip: str, request: str) -> Dict[str, Any]:
+    """
+    Make a request to the Shelly API v2.
+
+    Args:
+        ip (str): The IP address of the Shelly device.
+        request (str): The API request to make.
+
+    Returns:
+        Dict[str, Any]: The response data from the API.
+    """
     head = {'Content-type': 'application/json'}
     response = requests.get('http://' + ip + '/rpc/' + request, timeout = 5, headers = head)
     return json.loads(response.text) if response.status_code == 200 else {}

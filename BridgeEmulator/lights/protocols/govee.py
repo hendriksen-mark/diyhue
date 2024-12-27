@@ -23,7 +23,16 @@ def get_headers() -> Dict[str, str]:
         "Content-Type": "application/json"
     }
 
-def is_json(content):
+def is_json(content: str) -> bool:
+    """
+    Check if the content is valid JSON.
+
+    Args:
+        content (str): The content to check.
+
+    Returns:
+        bool: True if the content is valid JSON, False otherwise.
+    """
     try:
         json.loads(content)
     except ValueError:

@@ -106,14 +106,15 @@ class Light:
                 if "max_bri" in self.protocol_cfg and self.protocol_cfg["max_bri"] < state["bri"]:
                     state["bri"] = self.protocol_cfg["max_bri"]
 
-        for protocol in protocols:
-            if "lights.protocols." + self.protocol == protocol.__name__:
-                try:
-                    protocol.set_light(self, state)
-                    self.state["reachable"] = True
-                except Exception as e:
-                    self.state["reachable"] = False
-                    logging.warning(f"{self.name} light error, details: {e}")
+        if self.protocol not in ["dummy"]:
+            for protocol in protocols:
+                if "lights.protocols." + self.protocol == protocol.__name__:
+                    try:
+                        protocol.set_light(self, state)
+                        self.state["reachable"] = True
+                    except Exception as e:
+                        self.state["reachable"] = False
+                        logging.warning(f"{self.name} light error, details: {e}")
         if advertise:
             if "lights" in state:
                 for item in state["lights"]:

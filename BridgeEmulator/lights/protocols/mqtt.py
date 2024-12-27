@@ -11,6 +11,16 @@ from functions.colors import hsv_to_rgb, convert_xy
 logging = logManager.logger.get_logger(__name__)
 
 def create_payload(lightsData: Dict[str, Any], light: Any) -> Dict[str, Any]:
+    """
+    Create the payload for the MQTT message based on the light data.
+
+    Args:
+        lightsData (Dict[str, Any]): The data for the lights.
+        light (Any): The light object.
+
+    Returns:
+        Dict[str, Any]: The payload for the MQTT message.
+    """
     payload = {"transition": 0.3}
     colorFromHsv = False
     for key, value in lightsData.items():
@@ -41,6 +51,13 @@ def create_payload(lightsData: Dict[str, Any], light: Any) -> Dict[str, Any]:
     return payload
 
 def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the light state via MQTT.
+
+    Args:
+        light (Any): The light object.
+        data (Dict[str, Any]): The data to set the light state.
+    """
     messages = []
     lightsData = data.get("lights", {light.protocol_cfg["command_topic"]: data})
 
@@ -55,10 +72,13 @@ def set_light(light: Any, data: Dict[str, Any]) -> None:
         auth = {'username': mqtt_server["mqttUser"], 'password': mqtt_server["mqttPassword"]}
     publish.multiple(messages, hostname=mqtt_server["mqttServer"], port=mqtt_server["mqttPort"], auth=auth)
 
-def get_light_state(light: Any) -> Dict[str, Any]:
-    return {}
-
 def discover(mqtt_config: Dict[str, Any]) -> None:
+    """
+    Discover devices via MQTT.
+
+    Args:
+        mqtt_config (Dict[str, Any]): The MQTT configuration.
+    """
     if mqtt_config["enabled"]:
         logging.info("MQTT discovery called")
         auth = None

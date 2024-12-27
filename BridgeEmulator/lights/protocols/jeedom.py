@@ -1,30 +1,41 @@
 import configManager
 import requests
+from typing import Dict, Any
 
-bridgeConfig = configManager.bridgeConfig.yaml_config
 newLights = configManager.runtimeConfig.newLights
 
-def set_light(light, data):
-    url = "http://" + light.protocol_cfg["ip"] + "/core/api/jeeApi.php?apikey=" +light.protocol_cfg["light_api"] + "&type=cmd&id="
+def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the state of a light.
+
+    Args:
+        light: The light object containing protocol configuration.
+        data: A dictionary containing the state data to set (e.g., on, bri).
+    """
+    base_url = f"http://{light.protocol_cfg['ip']}/core/api/jeeApi.php?apikey={light.protocol_cfg['light_api']}&type=cmd&id="
     for key, value in data.items():
         if key == "on":
-            if value:
-                url += address[light]["light_on"]
-            else:
-                url += address[light]["light_off"]
+            url = base_url + (light.protocol_cfg["light_on"] if value else light.protocol_cfg["light_off"])
         elif key == "bri":
-            url += address[light]["light_slider"] + "&slider=" + str(round(float(value)/255*100)) # jeedom range from 0 to 100 (for zwave devices) instead of 0-255 of bridge
-    requests.get(url, timeout=3)
+            brightness = round(float(value) / 255 * 100)
+            url = f"{base_url}{light.protocol_cfg['light_slider']}&slider={brightness}"
+        requests.get(url, timeout=3)
 
-def get_light_state(address, light):
-    light_data = requests.get("http://" +light.protocol_cfg["ip"] + "/core/api/jeeApi.php?apikey=" + light.protocol_cfg["light_api"] + "&type=cmd&id=" + light.protocol_cfg["light_id"]).json()
-    state = {}
-    if light_data == 0:
-         state["on"] = False
-    else:
-         state["on"] = True
-    state["bri"] = str(round(float(light_data)/100*255))
+def get_light_state(light: Any) -> Dict[str, Any]:
+    """
+    Get the current state of a light.
+
+    Args:
+        light: The light object containing protocol configuration.
+
+    Returns:
+        A dictionary containing the current state of the light (e.g., on, bri).
+    """
+    url = f"http://{light.protocol_cfg['ip']}/core/api/jeeApi.php?apikey={light.protocol_cfg['light_api']}&type=cmd&id={light.protocol_cfg['light_id']}"
+    response = requests.get(url, timeout=3)
+    light_data = response.json()
+    state = {
+        "on": light_data != 0,
+        "bri": str(round(float(light_data) / 100 * 255))
+    }
     return state
-
-def discover():
-    pass

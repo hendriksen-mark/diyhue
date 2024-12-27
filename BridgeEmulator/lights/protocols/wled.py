@@ -7,16 +7,23 @@ import requests
 from functions.colors import convert_rgb_xy, convert_xy
 from time import sleep
 from zeroconf import IPVersion, ServiceBrowser, ServiceStateChange, Zeroconf
+from typing import List, Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
 
-discovered_lights = []
-Connections = {}
+discovered_lights: List[List[str]] = []
+Connections: Dict[str, 'WledDevice'] = {}
 
 
-def on_mdns_discover(zeroconf, service_type, name, state_change):
+def on_mdns_discover(zeroconf: Zeroconf, service_type: str, name: str, state_change: ServiceStateChange) -> None:
     """
     Callback function for mDNS discovery.
+    
+    Args:
+        zeroconf: Zeroconf instance
+        service_type: Type of the service
+        name: Name of the service
+        state_change: State change of the service
     """
     global discovered_lights
     if "wled" in name and state_change is ServiceStateChange.Added:
@@ -27,9 +34,13 @@ def on_mdns_discover(zeroconf, service_type, name, state_change):
             discovered_lights.append([addresses[0], name])
 
 
-def discover(detectedLights, device_ips):
+def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> None:
     """
     Discover WLED devices using mDNS and fallback to device IPs if necessary.
+    
+    Args:
+        detectedLights: List to store detected lights
+        device_ips: List of device IPs to fallback to
     """
     logging.info('<WLED> discovery started')
     ip_version = IPVersion.V4Only
@@ -78,9 +89,13 @@ def discover(detectedLights, device_ips):
             logging.error("<WLED> Error discovering device: %s", e)
 
 
-def set_light(light, data):
+def set_light(light: Dict[str, Any], data: Dict[str, Any]) -> None:
     """
     Set the state of a WLED light.
+    
+    Args:
+        light: Light configuration
+        data: Data to set the light state
     """
     ip = light.protocol_cfg['ip']
     if ip in Connections:
@@ -96,9 +111,14 @@ def set_light(light, data):
         send_light_data(wled_device, light, data)
 
 
-def send_light_data(wled_device, light, data):
+def send_light_data(wled_device: 'WledDevice', light: Dict[str, Any], data: Dict[str, Any]) -> None:
     """
     Send light data to the WLED device.
+    
+    Args:
+        wled_device: WledDevice instance
+        light: Light configuration
+        data: Data to send to the light
     """
     state = {}
     seg = {
@@ -127,9 +147,15 @@ def send_light_data(wled_device, light, data):
     wled_device.send_json(state)
 
 
-def get_light_state(light):
+def get_light_state(light: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get the current state of a WLED light.
+    
+    Args:
+        light: Light configuration
+        
+    Returns:
+        Current state of the light
     """
     ip = light.protocol_cfg['ip']
     if ip in Connections:
@@ -140,9 +166,19 @@ def get_light_state(light):
     return wled_device.get_seg_state(light.protocol_cfg['segmentId'])
 
 
-def translate_range(value, left_min, left_max, right_min, right_max):
+def translate_range(value: float, left_min: float, left_max: float, right_min: float, right_max: float) -> float:
     """
     Translate a value from one range to another.
+    
+    Args:
+        value: Value to translate
+        left_min: Minimum of the left range
+        left_max: Maximum of the left range
+        right_min: Minimum of the right range
+        right_max: Maximum of the right range
+        
+    Returns:
+        Translated value
     """
     left_span = left_max - left_min
     right_span = right_max - right_min
@@ -150,16 +186,30 @@ def translate_range(value, left_min, left_max, right_min, right_max):
     return right_min + (value_scaled * right_span)
 
 
-def clamp(num, min_val, max_val):
+def clamp(num: float, min_val: float, max_val: float) -> float:
     """
     Clamp a number between a minimum and maximum value.
+    
+    Args:
+        num: Number to clamp
+        min_val: Minimum value
+        max_val: Maximum value
+        
+    Returns:
+        Clamped number
     """
     return max(min(num, max_val), min_val)
 
 
-def kelvin_to_rgb(temp):
+def kelvin_to_rgb(temp: float) -> List[int]:
     """
     Convert a color temperature in Kelvin to an RGB color.
+    
+    Args:
+        temp: Color temperature in Kelvin
+        
+    Returns:
+        RGB color as a list of integers
     """
     tmp_kelvin = clamp(temp, 1000, 40000) / 100
     r = 255 if tmp_kelvin <= 66 else clamp(
@@ -176,7 +226,14 @@ class WledDevice:
     Class representing a WLED device.
     """
 
-    def __init__(self, ip, mdns_name):
+    def __init__(self, ip: str, mdns_name: str) -> None:
+        """
+        Initialize the WledDevice instance.
+        
+        Args:
+            ip: IP address of the device
+            mdns_name: mDNS name of the device
+        """
         self.ip = ip
         self.name = mdns_name.split(".")[0]
         self.url = f'http://{self.ip}'
@@ -186,14 +243,14 @@ class WledDevice:
         self.segments = []
         self.get_initial_state()
 
-    def get_initial_state(self):
+    def get_initial_state(self) -> None:
         """
         Get the initial state of the WLED device.
         """
         self.state = self.get_light_state()
         self.get_info()
 
-    def get_info(self):
+    def get_info(self) -> None:
         """
         Get information about the WLED device.
         """
@@ -204,16 +261,25 @@ class WledDevice:
         self.segmentCount = len(self.segments)
         self.udpPort = self.state['info']['udpport']
 
-    def get_light_state(self):
+    def get_light_state(self) -> Dict[str, Any]:
         """
         Get the current state of the WLED device.
+        
+        Returns:
+            Current state of the device
         """
         with urllib.request.urlopen(f"{self.url}/json") as resp:
             return json.loads(resp.read())
 
-    def get_seg_state(self, seg):
+    def get_seg_state(self, seg: int) -> Dict[str, Any]:
         """
         Get the state of a specific segment.
+        
+        Args:
+            seg: Segment ID
+            
+        Returns:
+            State of the segment
         """
         state = {}
         data = self.get_light_state()['state']
@@ -227,30 +293,47 @@ class WledDevice:
         state["colormode"] = "xy"
         return state
 
-    def set_rgb_seg(self, r, g, b, seg):
+    def set_rgb_seg(self, r: int, g: int, b: int, seg: int) -> None:
         """
         Set the RGB color of a specific segment.
+        
+        Args:
+            r: Red value
+            g: Green value
+            b: Blue value
+            seg: Segment ID
         """
         state = {"seg": [{"id": seg, "col": [[r, g, b]]}]}
         self.send_json(state)
 
-    def set_on_seg(self, on, seg):
+    def set_on_seg(self, on: bool, seg: int) -> None:
         """
         Turn a specific segment on or off.
+        
+        Args:
+            on: On/Off state
+            seg: Segment ID
         """
         state = {"seg": [{"id": seg, "on": on}]}
         self.send_json(state)
 
-    def set_bri_seg(self, bri, seg):
+    def set_bri_seg(self, bri: int, seg: int) -> None:
         """
         Set the brightness of a specific segment.
+        
+        Args:
+            bri: Brightness value
+            seg: Segment ID
         """
         state = {"seg": [{"id": seg, "bri": bri}]}
         self.send_json(state)
 
-    def send_json(self, data):
+    def send_json(self, data: Dict[str, Any]) -> None:
         """
         Send JSON data to the WLED device.
+        
+        Args:
+            data: Data to send
         """
         req = urllib.request.Request(f"{self.url}/json")
         req.add_header('Content-Type', 'application/json; charset=utf-8')

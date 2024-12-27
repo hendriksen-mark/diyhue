@@ -1,11 +1,22 @@
 import logManager
 from services.homeAssistantWS import connect_if_required, latest_states
 from pprint import pprint
+from typing import Dict, Any
 
 logging = logManager.logger.get_logger(__name__)
 
-def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_state):
-    '''
+def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state: Dict[str, Any], ha_state: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Translate Home Assistant state to Diy Hue state.
+
+    Args:
+        existing_diy_hue_state: The current state of the Diy Hue light.
+        ha_state: The state of the Home Assistant light.
+
+    Returns:
+        A dictionary representing the translated Diy Hue state.
+    """
+    """
     Home Assistant:
     {
         "entity_id": "light.my_light",
@@ -45,7 +56,8 @@ def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_sta
             0.435106
         ]
     },
-    '''
+    """
+
     try:
         diyhue_state = existing_diy_hue_state.copy()
 
@@ -77,14 +89,30 @@ def translate_homeassistant_state_to_diyhue_state(existing_diy_hue_state, ha_sta
         logging.error(f"Error translating Home Assistant state to Diy Hue state: {e}")
         return existing_diy_hue_state
 
-def set_light(light, data):
+def set_light(light: Any, data: Dict[str, Any]) -> None:
+    """
+    Set the state of a light.
+
+    Args:
+        light: The light object to set the state for.
+        data: The state data to set on the light.
+    """
     try:
         connection = connect_if_required()
         connection.change_light(light, data)
     except Exception as e:
         logging.error(f"Error setting light state: {e}")
 
-def get_light_state(light):
+def get_light_state(light: Any) -> Dict[str, Any]:
+    """
+    Get the current state of a light.
+
+    Args:
+        light: The light object to get the state for.
+
+    Returns:
+        A dictionary representing the current state of the light.
+    """
     try:
         connect_if_required()
         entity_id = light.protocol_cfg["entity_id"]

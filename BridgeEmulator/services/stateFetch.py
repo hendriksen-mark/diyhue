@@ -20,7 +20,7 @@ def syncWithLights(off_if_unreachable: bool) -> None:
         logging.info("start lights sync")
         for key, light in bridgeConfig["lights"].items():
             protocol_name: str = light.protocol
-            if protocol_name in ["mqtt", "flex", "mi_box", "dummy"]:
+            if protocol_name in ["mqtt", "flex", "mi_box", "dummy", "wiz", "milight", "tpkasa", "hue_bl"]:
                 continue
             for protocol in protocols:
                 if "lights.protocols." + protocol_name == protocol.__name__:

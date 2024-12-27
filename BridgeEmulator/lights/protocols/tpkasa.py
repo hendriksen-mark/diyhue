@@ -1,7 +1,6 @@
 import asyncio
 import colorsys
 import json
-import logging
 import socket
 
 from kasa import SmartLightStrip, Discover, TPLinkSmartHomeProtocol
@@ -312,11 +311,6 @@ def set_light(light, data):
 
 
     return state"""
-
-
-def get_light_state(light):
-    return {}
-
 
 """strip = KL430LightStrip(light.protocol_cfg["ip"])
     light_state = asyncio.run(get_state(strip))
