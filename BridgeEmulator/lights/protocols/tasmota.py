@@ -60,9 +60,9 @@ def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> Non
                 device_data = response.json()
                 #logging.debug(pretty_json(device_data))
                 if "StatusSTS" in device_data:
-                    logging.debug(f"tasmota: {ip} is a Tasmota device ")
-                    #logging.debug(f"tasmota: Hostname: {device_data["StatusNET"]["Hostname"]}")
-                    #logging.debug(f"tasmota: Mac:      {device_data["StatusNET"]["Mac"]}")
+                    logging.debug(f'tasmota: {ip} is a Tasmota device')
+                    logging.debug(f'tasmota: Hostname: {device_data["StatusNET"]["Hostname"]}')
+                    logging.debug(f'tasmota: Mac:      {device_data["StatusNET"]["Mac"]}')
 
                     properties = {"rgb": True, "ct": False, "ip": ip, "name": device_data["StatusNET"]["Hostname"], "id": device_data["StatusNET"]["Mac"], "mac": device_data["StatusNET"]["Mac"]}
                     detectedLights.append({"protocol": "tasmota", "name": device_data["StatusNET"]["Hostname"], "modelid": "LCT015", "protocol_cfg": {"ip": ip, "id": device_data["StatusNET"]["Mac"]}})

@@ -14,7 +14,7 @@ def set_light(light: Any, data: Dict[str, Any]) -> None:
         light: The light object containing protocol configuration and state.
         data: A dictionary containing the state data to be set.
     """
-    url = f"http://{light.protocol_cfg["ip"]}/gateways/{light.protocol_cfg["miID"]}/{light.protocol_cfg["miModes"]}/{str(light.protocol_cfg["miGroups"])}"
+    url = f'http://{light.protocol_cfg["ip"]}/gateways/{light.protocol_cfg["miID"]}/{light.protocol_cfg["miModes"]}/{str(light.protocol_cfg["miGroups"])}'
     payload = {}
     for key, value in data.items():
         if key == "on":
@@ -48,7 +48,7 @@ def get_light_state(light: Any) -> Dict[str, Any]:
     Returns:
         A dictionary containing the current state of the light.
     """
-    url = f"http://{light.protocol_cfg["ip"]}/gateways/{light.protocol_cfg["miID"]}/{light.protocol_cfg["miModes"]}/{str(light.protocol_cfg["miGroups"])}"
+    url = f'http://{light.protocol_cfg["ip"]}/gateways/{light.protocol_cfg["miID"]}/{light.protocol_cfg["miModes"]}/{str(light.protocol_cfg["miGroups"])}'
     r = requests.get(url, timeout=3)
     light_data = json.loads(r.text)
     state = {}

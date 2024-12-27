@@ -1,5 +1,9 @@
-import logging, binascii, socket, colorsys, time
+import binascii, socket, colorsys, time
 from functions.colors import convert_xy, rgbBrightness
+
+import logManager
+
+logging = logManager.logger.get_logger(__name__)
 
 #todo: add support for multiple mi boxes? these globals don't look nice
 commandCounter = 0

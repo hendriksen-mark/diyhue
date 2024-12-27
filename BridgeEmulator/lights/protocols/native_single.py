@@ -15,7 +15,7 @@ def set_light(light: Any, data: Dict[str, Any]) -> str:
     Returns:
         str: The response text from the light.
     """
-    state = requests.put(f"http://{light.protocol_cfg["ip"]}/state", json=data, timeout=3)
+    state = requests.put(f'http://{light.protocol_cfg["ip"]}/state', json=data, timeout=3)
     return state.text
 
 def get_light_state(light: Any) -> Dict[str, Any]:
@@ -28,5 +28,5 @@ def get_light_state(light: Any) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: The current state of the light.
     """
-    state = requests.get(f"http://{light.protocol_cfg["ip"]}/state", timeout=3)
+    state = requests.get(f'http://{light.protocol_cfg["ip"]}/state', timeout=3)
     return state.json()
