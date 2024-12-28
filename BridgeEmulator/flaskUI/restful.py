@@ -57,7 +57,7 @@ def buildConfig():
     config = bridgeConfig["config"]
     result.update({"Hue Essentials key": config["Hue Essentials key"], "Remote API enabled": config["Remote API enabled"], "apiversion": config["apiversion"], "bridgeid": config["bridgeid"],
                    "ipaddress": config["ipaddress"], "netmask": config["netmask"], "gateway": config["gateway"], "mac": config["mac"], "name": config["name"], "swversion": config["swversion"],
-                   "swupdate2": config["swupdate2"], "timezone": config["timezone"], "discovery": config["discovery"]})
+                   "swupdate2": config["swupdate2"], "timezone": config["timezone"], "discovery": config["discovery"], "factorynew": config["factorynew"]})
     result["UTC"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
     result["localtime"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     result["LogLevel"] = logManager.logger.get_level_name()
@@ -107,7 +107,7 @@ class NewUser(Resource):
 class ShortConfig(Resource):
     def get(self):
         config = bridgeConfig["config"]
-        return {"apiversion": config["apiversion"], "bridgeid": config["bridgeid"], "datastoreversion": staticConfig()["datastoreversion"], "factorynew": False, "mac": config["mac"], "modelid": "BSB002", "name": config["name"], "replacesbridgeid": None, "starterkitid": "", "swversion": config["swversion"]}
+        return {"apiversion": config["apiversion"], "bridgeid": config["bridgeid"], "datastoreversion": staticConfig()["datastoreversion"], "factorynew": config["factorynew"], "mac": config["mac"], "modelid": "BSB002", "name": config["name"], "replacesbridgeid": None, "starterkitid": "", "swversion": config["swversion"]}
 
 
 class EntireConfig(Resource):
@@ -142,7 +142,7 @@ class ResourceElements(Resource):
         elif resource == "config":
             config = bridgeConfig["config"]
 
-            return {"name": config["name"], "datastoreversion": staticConfig()["datastoreversion"], "swversion": config["swversion"], "apiversion": config["apiversion"], "mac": config["mac"], "bridgeid": config["bridgeid"], "factorynew": False, "replacesbridgeid": None, "modelid": staticConfig()["modelid"], "starterkitid": ""}
+            return {"name": config["name"], "datastoreversion": staticConfig()["datastoreversion"], "swversion": config["swversion"], "apiversion": config["apiversion"], "mac": config["mac"], "bridgeid": config["bridgeid"], "factorynew": config["factorynew"], "replacesbridgeid": None, "modelid": staticConfig()["modelid"], "starterkitid": ""}
         return [{"error": {"type": 1, "address": "/", "description": "unauthorized user"}}]
 
     def post(self, username, resource):

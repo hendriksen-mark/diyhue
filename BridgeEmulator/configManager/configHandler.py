@@ -77,6 +77,7 @@ class Config:
                 "SUB_IP_RANGE_END": int(self.argsDict["HOST_IP"].split('.')[2])
             },
             "scanonhostip": False,
+            "factorynew": False,
             "mqtt":{"enabled":False},
             "deconz":{"enabled":False},
             "alarm":{"enabled": False,"lasttriggered": 0},
