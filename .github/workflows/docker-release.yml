@@ -23,36 +23,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Enable qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Cache Docker layers
-        uses: actions/cache@v4
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ matrix.arch }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildx-${{ matrix.arch }}-
-
       - name: Build docker image
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          file: ./.build/Dockerfile
-          platforms: ${{ matrix.arch }}
-          tags: diyhue/diyhue:ci
-          build-args: |
-            TARGETPLATFORM=${{ matrix.arch }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
-
-      - name: Verify image exists
         run: |
-          docker images diyhue/diyhue:ci
+          docker build -t diyhue/diyhue:ci -f ./.build/Dockerfile --platform=${{ matrix.arch }} --build-arg TARGETPLATFORM=${{ matrix.arch }} .
 
       - name: Save tarball
         run: |
@@ -73,7 +50,7 @@ jobs:
         arch: [amd64, armv7, arm64, armv6]
     steps:
       - name: Enable qemu
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
