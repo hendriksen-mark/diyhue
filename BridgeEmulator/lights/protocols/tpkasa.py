@@ -30,9 +30,10 @@ class KL430LightStrip(SmartLightStrip):
 '''def create_multi_color(pixel, color, brightness=100):
     """Sets a pixel or a group of Pixel to color
     can called multiple times
-    :param pixel  pixel or Pixel Group (int or List<int>)
-    :param color  Color
-    :param brightness
+    Args:
+        pixel: pixel or Pixel Group (int or List<int>)
+        color: Color
+        brightness: Brightness level
     """
     if isinstance(pixel, int):
         multi_color[pixel] = [pixel, pixel, color[0], color[1], brightness, 2501]
@@ -44,11 +45,12 @@ class KL430LightStrip(SmartLightStrip):
 def create_gradient(color: list, brightness):
     multi_color = [[0, 0, 0, 0, 0, 0]] * 16
     """
-      Works but not good xD
-      creates a multi_color gradiant
-      :param color  list of colors for the gradient (5 Colors )
-      :param brightness
-      """
+    Works but not good xD
+    creates a multi_color gradiant
+    Args:
+        color: list of colors for the gradient (5 Colors)
+        brightness: Brightness level
+    """
     segment_sizes = [3, 2, 3, 3]
     fix_points = [0, 4, 7, 11, 15]
     index = 1
@@ -139,14 +141,14 @@ def translateRange(value, inMin, inMax, outMin, outMax):
 
 def build_request(command, state, protocol=None):
     """
-    :param state: parameters
-        examples:
-        {"hue": 100, "saturation": 50, "color_temp": 0,
-         "brightness": 50, "on_off": 1, "ignore_default": 1}}}  sets light to hsv
+    Args:
+        state: parameters
+            examples:
+            {"hue": 100, "saturation": 50, "color_temp": 0,
+             "brightness": 50, "on_off": 1, "ignore_default": 1}}  sets light to hsv
 
-
-    :param protocol :Optional smartlife.iot.lighting_effect, smartlife.iot.lightStrip,
-    :param command: set_lighting_effect, get_lighting_effect, get_light_state, set_light_state
+        protocol: Optional smartlife.iot.lighting_effect, smartlife.iot.lightStrip
+        command: set_lighting_effect, get_lighting_effect, get_light_state, set_light_state
     """
 
     if protocol is None:
