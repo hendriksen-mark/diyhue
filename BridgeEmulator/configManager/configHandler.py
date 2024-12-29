@@ -93,7 +93,7 @@ class Config:
             "hue": {},
             "tradfri": {},
             "homeassistant": {"enabled": False},
-            "govee": {"enabled": False, "api_key": ""},
+            "govee": {"enabled": False},
             "yeelight": {"enabled": True},
             "native_multi": {"enabled": True},
             "tasmota": {"enabled": True},
