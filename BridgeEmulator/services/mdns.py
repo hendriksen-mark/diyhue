@@ -17,10 +17,11 @@ class MDNSListener:
         """
         Initialize the MDNSListener with the given parameters.
         
-        :param ip: IP address of the service
-        :param port: Port number of the service
-        :param modelid: Model ID of the service
-        :param bridgeid: Bridge ID of the service
+        Args:
+            ip: IP address of the service
+            port: Port number of the service
+            modelid: Model ID of the service
+            bridgeid: Bridge ID of the service
         """
         self.ip: str = ip
         self.port: int = port
@@ -93,7 +94,8 @@ class MDNSListener:
         """
         Update the properties of the registered mDNS service.
         
-        :param new_props: Dictionary of new properties to update
+        Args:
+            new_props: Dictionary of new properties to update
         """
         if self.info:
             self.info.properties.update(new_props)
@@ -134,8 +136,11 @@ class MDNSListener:
         """
         Discover available mDNS services of a given type.
         
-        :param service_type: The type of service to discover
-        :return: List of discovered service names
+        Args:
+            service_type: The type of service to discover
+        
+        Returns:
+            List of discovered service names
         """
         logging.info(f'<MDNS> discovering services of type: {service_type}')
         services = self.zeroconf.get_service_info(service_type)
@@ -149,10 +154,11 @@ def mdnsListener(ip: str, port: int, modelid: str, bridgeid: str) -> None:
     """
     Function to start the mDNS listener with the given parameters.
     
-    :param ip: IP address of the service
-    :param port: Port number of the service
-    :param modelid: Model ID of the service
-    :param bridgeid: Bridge ID of the service
+    Args:
+        ip: IP address of the service
+        port: Port number of the service
+        modelid: Model ID of the service
+        bridgeid: Bridge ID of the service
     """
     listener = MDNSListener(ip, port, modelid, bridgeid)
     try:
