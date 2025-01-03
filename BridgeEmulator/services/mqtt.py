@@ -124,13 +124,17 @@ standardSensors = {
     "Remote Control N2": {
         "dataConversion": {
             "rootKey": "action",
-            "on": {"buttonevent": 1001},
-            "off": {"buttonevent": 2001},
-            "brightness_move_up": {"buttonevent": 1002},
-            "brightness_stop": {"buttonevent": 1003},
-            "brightness_move_down": {"buttonevent": 2002},
-            "arrow_left_click": {"buttonevent": 3002},
-            "arrow_right_click": {"many": 4002},
+            "on": {"buttonevent": 1000},
+            "off": {"buttonevent": 4000},
+            "brightness_move_up": {"buttonevent": 1001},#hold on
+            "brightness_move_down": {"buttonevent": 4001},#hold off
+            "brightness_stop": {"buttonevent": 1003},#release on/off
+            "arrow_left_click": {"buttonevent": 2000},
+            "arrow_left_hold": {"buttonevent": 2001},
+            "arrow_left_release": {"buttonevent": 2003},
+            "arrow_right_click": {"buttonevent": 3000},
+            "arrow_right_hold": {"buttonevent": 3001},
+            "arrow_right_release": {"buttonevent": 3003},
         }
     },
     "RDM002": {
