@@ -115,7 +115,7 @@ def handleActivateScene(behavior_instance: Dict[str, Any]) -> None:
                 if scene:
                     logging.info("Activate scene " + scene.name)
                     if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
-                        putDict = {"recall": {"action": "active"}, "minutes": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"]}
+                        putDict = {"recall": {"action": "active"}, "minutes": behavior_instance.configuration["when_extended"]["start_at"]["transition"].get("minutes", 3)}
                         scene.activate(putDict)
                 else:
                     group = findGroup(element["group"]["rid"])
@@ -124,7 +124,9 @@ def handleActivateScene(behavior_instance: Dict[str, Any]) -> None:
                         group.setV1Action(state={"ct": 247, "bri": 1})
                         sleep(1)
                         group.setV1Action(state={"on": True})
-                        group.setV1Action(state={"bri": 254, "transitiontime": behavior_instance.configuration["when_extended"]["start_at"]["transition"]["minutes"] * 60 * 10})
+                        if "when_extended" in behavior_instance.configuration and "transition" in behavior_instance.configuration["when_extended"]["start_at"]:
+                            transition_minutes = behavior_instance.configuration["when_extended"]["start_at"]["transition"].get("minutes", 3)
+                            group.setV1Action(state={"bri": 254, "transitiontime": transition_minutes * 60 * 10})
                 behavior_instance.active = "end_at" in behavior_instance.configuration["when_extended"]
 
 def handleCountdownTimer(behavior_instance: Dict[str, Any]) -> None:
