@@ -100,7 +100,7 @@ def daylightSensor(tz: str, sensor: Any) -> None:
 
     # v2 api routines
     for key, instance in bridgeConfig["behavior_instance"].items():
-        if "when_extended" in instance.configuration:
+        if instance.enabled and "when_extended" in instance.configuration:
             offset = 0
             time_point = instance.configuration["when_extended"]["start_at"]["time_point"]
             if "offset" in time_point:
