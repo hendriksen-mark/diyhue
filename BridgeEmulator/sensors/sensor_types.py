@@ -74,22 +74,12 @@ sensorTypes["TRADFRI remote control"] = {
 }
 
 # IKEA TRADFRI on/off switch
-sensorTypes["TRADFRI on/off switch"] = {
-    "ZHASwitch": {
-        "state": {"buttonevent": 1002, "lastupdated": "none"},
-        "config": {"alert": "none", "battery": 90, "on": True, "reachable": True},
-        "static": {"swversion": "2.2.008", "manufacturername": "IKEA of Sweden"}
-    }
-}
+sensorTypes["TRADFRI on/off switch"] = sensorTypes["TRADFRI remote control"]
 
 # IKEA TRADFRI wireless dimmer
-sensorTypes["TRADFRI wireless dimmer"] = {
-    "ZHASwitch": {
-        "state": {"buttonevent": 1002, "lastupdated": "none"},
-        "config": {"alert": "none", "battery": 90, "on": True, "reachable": True},
-        "static": {"swversion": "1.2.248", "manufacturername": "IKEA of Sweden"}
-    }
-}
+sensorTypes["TRADFRI wireless dimmer"] = sensorTypes["TRADFRI remote control"]
+
+sensorTypes["Remote Control N2"] = sensorTypes["TRADFRI remote control"]
 
 # Fix Deconz types
 # not used anymore?
