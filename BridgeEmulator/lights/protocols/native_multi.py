@@ -108,7 +108,7 @@ def discover(detectedLights: List[Dict[str, Any]], device_ips: List[str]) -> Lis
                             "light_nr": x,
                             "mac": device_data["mac"]
                         }
-                        if device_data["modelid"] in ["LCX002", "915005987201", "LCX004"]:
+                        if device_data["modelid"] in ["LCX002", "915005987201", "LCX004", "LCX006"]:
                             protocol_cfg["points_capable"] = 5
                         detectedLights.append({
                             "protocol": protocol,

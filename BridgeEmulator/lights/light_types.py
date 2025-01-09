@@ -597,7 +597,7 @@ lightTypes["LCX006"] = {
         "certified": True,
         "hardware_platform_type": "100b-118",
         "manufacturer_name": "Signify Netherlands B.V.",
-        "model_id": "LCX004",
+        "model_id": "LCX006",
         "product_archetype": "hue_lightstrip",
         "product_name": "Hue gradient lightstrip",
         "software_version": "1.94.2"

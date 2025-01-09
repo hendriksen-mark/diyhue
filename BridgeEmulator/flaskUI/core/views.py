@@ -123,6 +123,8 @@ def get_light_types() -> Union[Dict[str, Any], str]:
         light.modelid = modelId
         light.state = lightTypes[modelId]["state"]
         light.config = lightTypes[modelId]["config"]
+        if modelId in ["LCX002", "915005987201", "LCX004", "LCX006"]:
+            light.protocol_cfg["points_capable"] = 5
         return "success"
 
 @core.route('/tradfri', methods=['POST'])
