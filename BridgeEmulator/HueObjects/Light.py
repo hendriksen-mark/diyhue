@@ -70,6 +70,8 @@ class Light:
         if "mode" in self.state:
             result["state"]["mode"] = self.state["mode"]
         result["state"]["reachable"] = self.state["reachable"]
+        if self.modelid in ["LCX002", "915005987201", "LCX004", "LCX006"]:
+            result["state"]["gradient"] = {"points": self.state["gradient"]["points"], "points_capable": self.protocol_cfg["points_capable"]}
         result["modelid"] = self.modelid
         result["name"] = self.name
         result["uniqueid"] = self.uniqueid
