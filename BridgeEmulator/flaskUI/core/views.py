@@ -126,6 +126,20 @@ def get_light_types() -> Union[Dict[str, Any], str]:
         if modelId in ["LCX002", "915005987201", "LCX004", "LCX006"]:
             light.protocol_cfg["points_capable"] = 5
         return "success"
+    
+@core.route('/all_data')
+def get_all_data() -> Dict[str, Any]:
+    """
+    Get all the bridge data.
+
+    Args:
+        None
+
+    Returns:
+        Dict[str, Any]: The bridge data.
+    """
+    saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene"]
+    return {resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources}, {"lightTypes": list(lightTypes.keys())}
 
 @core.route('/tradfri', methods=['POST'])
 def pairTradfri() -> Dict[str, Any]:
