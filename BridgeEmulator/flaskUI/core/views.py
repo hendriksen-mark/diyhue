@@ -140,9 +140,11 @@ def get_all_data() -> Dict[str, Any]:
         Dict[str, Any]: The bridge data.
     """
     saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene"]
-    output = {
-        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
-    }
+    output = {}
+    for resource in saveResources:
+        output[resource] = {
+            key: {**obj.save(), **obj.__dict__} for key, obj in bridgeConfig[resource].items()
+        }
     output["lightTypes"] = list(lightTypes.keys())
     output["config"] = bridgeConfig["config"]
     output["config"].update(buildConfig())
