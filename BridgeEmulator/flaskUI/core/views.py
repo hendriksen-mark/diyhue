@@ -143,6 +143,7 @@ def get_all_data() -> Dict[str, Any]:
         resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
     }
     output["lightTypes"] = list(lightTypes.keys())
+    output["config"] = bridgeConfig["config"]
     return output
 
 @core.route('/tradfri', methods=['POST'])
