@@ -16,6 +16,8 @@ from functions.rules import rulesProcessor
 from services.entertainment import entertainmentService
 from services.updateManager import githubCheck, versionCheck, githubInstall
 from werkzeug.security import generate_password_hash
+from lights.light_types import lightTypes
+import subprocess
 
 try:
     from time import tzset
@@ -138,6 +140,30 @@ class ResourceElements(Resource):
                         response[object] = bridgeConfig[resource][object].getV1Api().copy()
                 elif resource == "config":
                     response = buildConfig()
+                elif resource == "all_data":
+                    saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene"]
+                    response = {
+                        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
+                    }
+                    for resource in saveResources:
+                        for resource_id in bridgeConfig[resource]:
+                            obj = bridgeConfig[resource][resource_id]
+                            if hasattr(obj, 'getV1Api'):
+                                # Update the response with additional data from getV1Api
+                                response[resource][resource_id].update(obj.getV1Api().copy())
+                    response["lightTypes"] = list(lightTypes.keys())
+                    response["config"] = bridgeConfig["config"]
+                    response["config"].update(buildConfig())
+                    uname = os.uname()
+                    response["info"] = {
+                            "sysname": uname.sysname,
+                            "machine": uname.machine,
+                            "os_version": uname.version,
+                            "os_release": uname.release,
+                            "diyhue": subprocess.run("stat -c %y HueEmulator3.py", shell=True, capture_output=True, text=True).stdout.strip(),
+                            "webui": subprocess.run("stat -c %y flaskUI/templates/index.html", shell=True, capture_output=True, text=True).stdout.strip()
+                        }
+                    response["timezones"] = capabilities()["timezones"]["values"]
                 return response
         elif resource == "config":
             config = bridgeConfig["config"]
