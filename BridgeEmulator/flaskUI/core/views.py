@@ -146,8 +146,10 @@ def get_all_data() -> Dict[str, Any]:
     for resource in saveResources:
         for resource_id in bridgeConfig[resource]:
             if resource_id != "0":
-                # Update the output with additional data from getV1Api
-                output[resource][resource_id].update(bridgeConfig[resource][resource_id].getV1Api().copy())
+                obj = bridgeConfig[resource][resource_id]
+                if hasattr(obj, 'getV1Api'):
+                    # Update the output with additional data from getV1Api
+                    output[resource][resource_id].update(obj.getV1Api().copy())
     output["lightTypes"] = list(lightTypes.keys())
     output["config"] = bridgeConfig["config"]
     output["config"].update(buildConfig())
