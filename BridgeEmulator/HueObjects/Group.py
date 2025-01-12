@@ -330,7 +330,7 @@ class Group:
             Dict[str, Any]: The group's data.
         """
         result = {"id_v2": self.id_v2, "name": self.name, "class": self.icon_class, "lights": [], "action": self.action, "type": self.type}
-        if hasattr(self, "owner"):
+        if hasattr(self, "owner") and self.owner is not None:
             result["owner"] = self.owner.username
         for light_ref in self.lights:
             light_instance = light_ref()
