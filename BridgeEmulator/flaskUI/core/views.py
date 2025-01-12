@@ -16,6 +16,7 @@ import logManager
 import subprocess
 from typing import Dict, Any, Union
 from flaskUI.restful import buildConfig
+from functions.core import capabilities
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config
@@ -152,6 +153,8 @@ def get_all_data() -> Dict[str, Any]:
     output["lightTypes"] = list(lightTypes.keys())
     output["config"] = bridgeConfig["config"]
     output["config"].update(buildConfig())
+    output["info"] = info()
+    output["timezones"] = capabilities()["timezones"]
     return output
 
 @core.route('/tradfri', methods=['POST'])
