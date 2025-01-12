@@ -15,6 +15,7 @@ import sys
 import logManager
 import subprocess
 from typing import Dict, Any, Union
+from flaskUI.restful import buildConfig
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config
@@ -144,6 +145,7 @@ def get_all_data() -> Dict[str, Any]:
     }
     output["lightTypes"] = list(lightTypes.keys())
     output["config"] = bridgeConfig["config"]
+    output["config"].update(buildConfig())
     return output
 
 @core.route('/tradfri', methods=['POST'])
