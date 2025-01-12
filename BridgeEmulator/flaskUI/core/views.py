@@ -139,7 +139,11 @@ def get_all_data() -> Dict[str, Any]:
         Dict[str, Any]: The bridge data.
     """
     saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene"]
-    return {resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources}, {"lightTypes": list(lightTypes.keys())}
+    output = {
+        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
+    }
+    output["lightTypes"] = list(lightTypes.keys())
+    return output
 
 @core.route('/tradfri', methods=['POST'])
 def pairTradfri() -> Dict[str, Any]:
