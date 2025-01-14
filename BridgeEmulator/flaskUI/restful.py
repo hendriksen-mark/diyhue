@@ -152,9 +152,9 @@ class ResourceElements(Resource):
                                 # Update the response with additional data from getV1Api
                                 response[resource][resource_id].update(obj.getV1Api().copy())
                     response["lightTypes"] = list(lightTypes.keys())
-                    response["config"] = bridgeConfig["config"]
-                    response["config"].update(buildConfig())
                     uname = os.uname()
+                    response["config"] = buildConfig()
+                    response["config"].update(bridgeConfig["config"])
                     response["info"] = {
                             "sysname": uname.sysname,
                             "machine": uname.machine,

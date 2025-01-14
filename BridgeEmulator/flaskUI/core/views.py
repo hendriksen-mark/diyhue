@@ -15,8 +15,6 @@ import sys
 import logManager
 import subprocess
 from typing import Dict, Any, Union
-from flaskUI.restful import buildConfig
-from functions.core import capabilities
 
 logging = logManager.logger.get_logger(__name__)
 bridgeConfig = configManager.bridgeConfig.yaml_config
@@ -128,34 +126,6 @@ def get_light_types() -> Union[Dict[str, Any], str]:
         if modelId in ["LCX002", "915005987201", "LCX004", "LCX006"]:
             light.protocol_cfg["points_capable"] = 5
         return "success"
-    
-@core.route('/all_data')
-def get_all_data() -> Dict[str, Any]:
-    """
-    Get all the bridge data.
-
-    Args:
-        None
-
-    Returns:
-        Dict[str, Any]: The bridge data.
-    """
-    saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene"]
-    output = {
-        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
-    }
-    for resource in saveResources:
-        for resource_id in bridgeConfig[resource]:
-            obj = bridgeConfig[resource][resource_id]
-            if hasattr(obj, 'getV1Api'):
-                # Update the output with additional data from getV1Api
-                output[resource][resource_id].update(obj.getV1Api().copy())
-    output["lightTypes"] = list(lightTypes.keys())
-    output["config"] = bridgeConfig["config"]
-    output["config"].update(buildConfig())
-    output["info"] = info()
-    output["timezones"] = capabilities()["timezones"]
-    return output
 
 @core.route('/tradfri', methods=['POST'])
 def pairTradfri() -> Dict[str, Any]:
