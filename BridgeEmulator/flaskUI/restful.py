@@ -141,11 +141,11 @@ class ResourceElements(Resource):
                 elif resource == "config":
                     response = buildConfig()
                 elif resource == "all_data":
-                    saveResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene", "apiUsers"]
+                    getResources = ["lights", "groups", "scenes", "rules", "resourcelinks", "schedules", "sensors", "behavior_instance", "smart_scene", "apiUsers"]
                     response = {
-                        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in saveResources
+                        resource: {key: obj.save() for key, obj in bridgeConfig[resource].items()} for resource in getResources
                     }
-                    for resource in saveResources:
+                    for resource in getResources:
                         for resource_id in bridgeConfig[resource]:
                             obj = bridgeConfig[resource][resource_id]
                             if hasattr(obj, 'getV1Api'):
