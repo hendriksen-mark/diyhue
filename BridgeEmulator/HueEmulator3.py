@@ -20,6 +20,9 @@ from flaskUI.v2restapi import AuthV1, ClipV2, ClipV2Resource, ClipV2ResourceId
 from flaskUI.espDevices import Switch
 from flaskUI.Credits import Credits
 from functions.daylightSensor import daylightSensor
+from hypercorn.asyncio import serve
+from hypercorn.config import Config as HyperConfig
+import asyncio
 
 # Initialize configurations and logging
 bridgeConfig = configManager.bridgeConfig.yaml_config
@@ -101,30 +104,67 @@ app.register_blueprint(devices)
 app.register_blueprint(error_pages)
 app.register_blueprint(stream)
 
+def check_cert(CONFIG_PATH):
+    if not os.path.exists(CONFIG_PATH + "/private.key") and not os.path.exists(CONFIG_PATH + "/public.crt") and os.path.exists(CONFIG_PATH + "/cert.pem"):
+        with open(CONFIG_PATH + "/cert.pem", 'r') as file:
+                lines = []
+                for line in file:
+                    lines.append(line)
+                    if line.strip() == '-----END PRIVATE KEY-----':
+                        break
+
+        private_key_content = ''.join(lines)
+        print(private_key_content)
+        with open(CONFIG_PATH + "/private.key", 'w') as file:
+            file.write(private_key_content)
+        
+        with open(CONFIG_PATH + "/cert.pem", 'r') as file:
+            lines = []
+            read_certificate = False
+            for line in file:
+                if line.strip() == '-----BEGIN CERTIFICATE-----':
+                    read_certificate = True
+                if read_certificate:
+                    lines.append(line)
+
+        certificate_content = ''.join(lines)
+        print(certificate_content)
+        with open(CONFIG_PATH + "/public.crt", 'w') as file:
+            file.write(certificate_content)
+
 def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
-    ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    ctx.load_cert_chain(certfile=CONFIG_PATH + "/cert.pem")
-    ctx.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
-    ctx.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256')
-    ctx.set_ecdh_curve('prime256v1')
+    config = HyperConfig()
+    config.bind = [f"{BIND_IP}:{HOST_HTTPS_PORT}"]
+    config.certfile = CONFIG_PATH + "/public.crt"
+    config.keyfile = CONFIG_PATH + "/private.key"
+    config.alpn_protocols = ["h2"]
+    
     try:
-        app.run(host=BIND_IP, port=HOST_HTTPS_PORT, ssl_context=ctx)
+        logging.info(f"Starting HTTPS server on {BIND_IP}:{HOST_HTTPS_PORT}")
+        logging.info(f"Using certificate file: {config.certfile}")
+        logging.info(f"Using key file: {config.keyfile}")
+        asyncio.run(serve(app, config))
     except ssl.SSLError as ssl_error:
         logging.error(f"SSL error occurred: {ssl_error}")
-    except OSError as e:
-        if e.errno == 98:
-            logging.error(f"HTTPS server could not start on host:port {BIND_IP}:{HOST_HTTPS_PORT}. The port is already in use. {e.errno}")
-        else:
-            logging.error(f"HTTPS server failed to start: {e}")
+    except ConnectionResetError as conn_error:
+        logging.error(f"Connection reset error occurred: {conn_error}")
+    except Exception as e:
+        logging.error(f"Unexpected error occurred: {e}")
+    finally:
+        logging.info("HTTPS server has stopped")
 
 def runHttp(BIND_IP, HOST_HTTP_PORT):
+    config = HyperConfig()
+    config.bind = [f"{BIND_IP}:{HOST_HTTP_PORT}"]
+    config.alpn_protocols = ["h2"]
+    
     try:
-        app.run(host=BIND_IP, port=HOST_HTTP_PORT)
-    except OSError as e:
-        if e.errno == 98:
-            logging.error(f"HTTP server could not start on host:port {BIND_IP}:{HOST_HTTP_PORT}. The port is already in use. {e.errno}")
-        else:
-            logging.error(f"HTTP server failed to start: {e}")
+        logging.info(f"Starting HTTP server on {BIND_IP}:{HOST_HTTP_PORT}")
+        asyncio.run(serve(app, config))
+    except ConnectionResetError as conn_error:
+        logging.error(f"Connection reset error occurred: {conn_error}")
+    except Exception as e:
+        logging.error(f"Unexpected error occurred: {e}")
 
 if __name__ == '__main__':
     from services import mqtt, deconz, ssdp, mdns, scheduler, remoteApi, remoteDiscover, entertainment, stateFetch, eventStreamer, homeAssistantWS, updateManager
@@ -136,6 +176,7 @@ if __name__ == '__main__':
     HOST_HTTPS_PORT = configManager.runtimeConfig.arg["HTTPS_PORT"]
     CONFIG_PATH = configManager.runtimeConfig.arg["CONFIG_PATH"]
     DISABLE_HTTPS = configManager.runtimeConfig.arg["noServeHttps"]
+    check_cert(CONFIG_PATH)
     updateManager.startupCheck()
 
     Thread(target=daylightSensor, args=[bridgeConfig["config"]["timezone"], bridgeConfig["sensors"]["1"]]).start()
@@ -156,6 +197,8 @@ if __name__ == '__main__':
     Thread(target=scheduler.runScheduler).start()
     Thread(target=eventStreamer.messageBroker).start()
 
+    # Run HTTP and HTTPS servers concurrently
     if not DISABLE_HTTPS:
-        Thread(target=runHttps, args=[BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH]).start()
-    runHttp(BIND_IP, HOST_HTTP_PORT)
+        Thread(target=runHttps, args=(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH)).start()
+
+    Thread(target=runHttp, args=(BIND_IP, HOST_HTTP_PORT)).start()
