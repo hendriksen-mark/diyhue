@@ -27,7 +27,8 @@ import asyncio
 # Initialize configurations and logging
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
-_ = logManager.logger.get_logger("werkzeug")
+werkzeug_logger = logManager.logger.get_logger("werkzeug")
+hypercorn_logger = logManager.logger.get_logger("hypercorn")
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # Initialize Flask app and API
@@ -105,44 +106,39 @@ app.register_blueprint(error_pages)
 app.register_blueprint(stream)
 
 def check_cert(CONFIG_PATH):
-    if not os.path.exists(CONFIG_PATH + "/private.key") and not os.path.exists(CONFIG_PATH + "/public.crt") and os.path.exists(CONFIG_PATH + "/cert.pem"):
-        with open(CONFIG_PATH + "/cert.pem", 'r') as file:
-                lines = []
-                for line in file:
-                    lines.append(line)
-                    if line.strip() == '-----END PRIVATE KEY-----':
-                        break
+    private_key_path = os.path.join(CONFIG_PATH, "private.key")
+    public_crt_path = os.path.join(CONFIG_PATH, "public.crt")
+    cert_pem_path = os.path.join(CONFIG_PATH, "cert.pem")
 
-        private_key_content = ''.join(lines)
-        print(private_key_content)
-        with open(CONFIG_PATH + "/private.key", 'w') as file:
-            file.write(private_key_content)
-        
-        with open(CONFIG_PATH + "/cert.pem", 'r') as file:
-            lines = []
-            read_certificate = False
-            for line in file:
-                if line.strip() == '-----BEGIN CERTIFICATE-----':
-                    read_certificate = True
-                if read_certificate:
-                    lines.append(line)
+    if not os.path.exists(private_key_path) and not os.path.exists(public_crt_path) and os.path.exists(cert_pem_path):
+        try:
+            with open(cert_pem_path, 'r') as file:
+                lines = file.readlines()
 
-        certificate_content = ''.join(lines)
-        print(certificate_content)
-        with open(CONFIG_PATH + "/public.crt", 'w') as file:
-            file.write(certificate_content)
+            private_key_content = ''.join(lines[:lines.index('-----END PRIVATE KEY-----\n') + 1])
+            certificate_content = ''.join(lines[lines.index('-----BEGIN CERTIFICATE-----\n'):])
 
-def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
+            with open(private_key_path, 'w') as file:
+                file.write(private_key_content)
+            logging.info(f"Private key written to {private_key_path}")
+
+            with open(public_crt_path, 'w') as file:
+                file.write(certificate_content)
+            logging.info(f"Public certificate written to {public_crt_path}")
+
+        except Exception as e:
+            logging.error(f"Error processing certificate files: {e}")
+
+def runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH):
     config = HyperConfig()
-    config.bind = [f"{BIND_IP}:{HOST_HTTPS_PORT}"]
-    config.certfile = CONFIG_PATH + "/public.crt"
-    config.keyfile = CONFIG_PATH + "/private.key"
+    config.insecure_bind = [f"{BIND_IP}:{HOST_HTTP_PORT}"]
     config.alpn_protocols = ["h2"]
+    if not DISABLE_HTTPS:
+        config.bind = [f"{BIND_IP}:{HOST_HTTPS_PORT}"]
+        config.certfile = CONFIG_PATH + "/public.crt"
+        config.keyfile = CONFIG_PATH + "/private.key"
     
     try:
-        logging.info(f"Starting HTTPS server on {BIND_IP}:{HOST_HTTPS_PORT}")
-        logging.info(f"Using certificate file: {config.certfile}")
-        logging.info(f"Using key file: {config.keyfile}")
         asyncio.run(serve(app, config))
     except ssl.SSLError as ssl_error:
         logging.error(f"SSL error occurred: {ssl_error}")
@@ -151,20 +147,7 @@ def runHttps(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH):
     except Exception as e:
         logging.error(f"Unexpected error occurred: {e}")
     finally:
-        logging.info("HTTPS server has stopped")
-
-def runHttp(BIND_IP, HOST_HTTP_PORT):
-    config = HyperConfig()
-    config.bind = [f"{BIND_IP}:{HOST_HTTP_PORT}"]
-    config.alpn_protocols = ["h2"]
-    
-    try:
-        logging.info(f"Starting HTTP server on {BIND_IP}:{HOST_HTTP_PORT}")
-        asyncio.run(serve(app, config))
-    except ConnectionResetError as conn_error:
-        logging.error(f"Connection reset error occurred: {conn_error}")
-    except Exception as e:
-        logging.error(f"Unexpected error occurred: {e}")
+        logging.info("HTTP/HTTPS server has stopped")
 
 if __name__ == '__main__':
     from services import mqtt, deconz, ssdp, mdns, scheduler, remoteApi, remoteDiscover, entertainment, stateFetch, eventStreamer, homeAssistantWS, updateManager
@@ -197,8 +180,4 @@ if __name__ == '__main__':
     Thread(target=scheduler.runScheduler).start()
     Thread(target=eventStreamer.messageBroker).start()
 
-    # Run HTTP and HTTPS servers concurrently
-    if not DISABLE_HTTPS:
-        Thread(target=runHttps, args=(BIND_IP, HOST_HTTPS_PORT, CONFIG_PATH)).start()
-
-    Thread(target=runHttp, args=(BIND_IP, HOST_HTTP_PORT)).start()
+    runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH)
