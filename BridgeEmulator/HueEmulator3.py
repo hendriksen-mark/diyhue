@@ -28,7 +28,6 @@ import asyncio
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
 werkzeug_logger = logManager.logger.get_logger("werkzeug")
-hypercorn_logger = logManager.logger.get_logger("hypercorn")
 WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # Initialize Flask app and API
@@ -131,6 +130,8 @@ def check_cert(CONFIG_PATH):
 
 def runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH):
     config = HyperConfig()
+    config.accesslog = logManager.logger.get_logger('hypercorn.access')
+    config.errorlog = logManager.logger.get_logger('hypercorn.error')
     config.insecure_bind = [f"{BIND_IP}:{HOST_HTTP_PORT}"]
     config.alpn_protocols = ["h2"]
     if not DISABLE_HTTPS:
