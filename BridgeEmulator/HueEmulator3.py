@@ -3,10 +3,13 @@ from flask import Flask
 from flask_cors import CORS
 from flask_restful import Api
 from werkzeug.security import check_password_hash
-from werkzeug.serving import WSGIRequestHandler
 from threading import Thread
 import ssl
 import os
+from hypercorn.asyncio import serve
+from hypercorn.config import Config as HyperConfig
+import asyncio
+import time
 
 import configManager
 import logManager
@@ -20,15 +23,10 @@ from flaskUI.v2restapi import AuthV1, ClipV2, ClipV2Resource, ClipV2ResourceId
 from flaskUI.espDevices import Switch
 from flaskUI.Credits import Credits
 from functions.daylightSensor import daylightSensor
-from hypercorn.asyncio import serve
-from hypercorn.config import Config as HyperConfig
-import asyncio
 
 # Initialize configurations and logging
 bridgeConfig = configManager.bridgeConfig.yaml_config
 logging = logManager.logger.get_logger(__name__)
-werkzeug_logger = logManager.logger.get_logger("werkzeug")
-WSGIRequestHandler.protocol_version = "HTTP/1.1"
 
 # Initialize Flask app and API
 app = Flask(__name__, template_folder='flaskUI/templates', static_url_path="/assets", static_folder='flaskUI/assets')
@@ -130,8 +128,10 @@ def check_cert(CONFIG_PATH):
 
 def runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH):
     config = HyperConfig()
-    config.accesslog = logManager.logger.get_logger('hypercorn.access')
-    config.errorlog = logManager.logger.get_logger('hypercorn.error')
+    config.accesslog = logManager.logger.get_logger('hypercorn')
+    config.errorlog = logManager.logger.get_logger('hypercorn')
+    config.loglevel = 'DEBUG'
+    config.access_log_format = '%(h)s %(r)s %(s)s'
     config.insecure_bind = [f"{BIND_IP}:{HOST_HTTP_PORT}"]
     config.alpn_protocols = ["h2"]
     if not DISABLE_HTTPS:
@@ -139,16 +139,26 @@ def runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH
         config.certfile = CONFIG_PATH + "/public.crt"
         config.keyfile = CONFIG_PATH + "/private.key"
     
-    try:
-        asyncio.run(serve(app, config))
-    except ssl.SSLError as ssl_error:
-        logging.error(f"SSL error occurred: {ssl_error}")
-    except ConnectionResetError as conn_error:
-        logging.error(f"Connection reset error occurred: {conn_error}")
-    except Exception as e:
-        logging.error(f"Unexpected error occurred: {e}")
-    finally:
-        logging.info("HTTP/HTTPS server has stopped")
+    while True:
+        try:
+            logging.info("Starting HTTP/HTTPS server")
+            asyncio.run(serve(app, config))
+        except ssl.SSLError as ssl_error:
+            if ssl_error.reason == 'APPLICATION_DATA_AFTER_CLOSE_NOTIFY':
+                logging.warning(f"SSL error occurred: {ssl_error} - Ignoring and continuing")
+            else:
+                logging.error(f"SSL error occurred: {ssl_error}")
+        except ConnectionResetError as conn_error:
+            logging.error(f"Connection reset error occurred: {conn_error}")
+        except OSError as os_error:
+            if os_error.winerror == 121:
+                logging.warning(f"OSError occurred: {os_error} - Ignoring and continuing")
+            else:
+                logging.error(f"OSError occurred: {os_error}")
+        except Exception as e:
+            logging.error(f"Unexpected error occurred: {e}")
+        finally:
+            logging.info("HTTP/HTTPS server has stopped")
 
 if __name__ == '__main__':
     from services import mqtt, deconz, ssdp, mdns, scheduler, remoteApi, remoteDiscover, entertainment, stateFetch, eventStreamer, homeAssistantWS, updateManager
@@ -182,3 +192,4 @@ if __name__ == '__main__':
     Thread(target=eventStreamer.messageBroker).start()
 
     runHttp(BIND_IP, HOST_HTTP_PORT, HOST_HTTPS_PORT, DISABLE_HTTPS, CONFIG_PATH)
+    logging.info("HTTP/HTTPS server thread started")
