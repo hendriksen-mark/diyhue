@@ -14,13 +14,14 @@ ARG TARGETPLATFORM
 COPY requirements.txt ./
 
 ## Install requirements
-RUN apt update \
-    && apt install --no-install-recommends -y \
+RUN apt update
+RUN dpkg --configure -a
+RUN apt install --no-install-recommends -y \
         curl unzip python3-minimal python3-pip python3-dev python3-setuptools gcc \
-        openssl nmap psmisc iproute2 bluez bluetooth libcoap3-bin faketime \
-    && pip3 install -r requirements.txt --no-cache-dir --break-system-packages \
-    && apt purge -y python3-pip python3-setuptools python3-dev gcc \
-    && apt autoremove -y \
+        openssl nmap psmisc iproute2 bluez bluetooth libcoap3-bin faketime
+RUN pip3 install -r requirements.txt --no-cache-dir --break-system-packages
+RUN apt purge -y python3-pip python3-setuptools python3-dev gcc
+RUN apt autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
 ## Install diyHue
